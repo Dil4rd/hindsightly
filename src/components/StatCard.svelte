@@ -21,6 +21,7 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1rem;
+    min-height: 6.5rem;
     display: flex;
     flex-direction: column;
     align-items: center;
