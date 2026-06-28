@@ -10,15 +10,33 @@
 
   const toData = (s: DailySeries): uPlot.AlignedData => [s.t, s.opened, s.closed]
 
-  // Daily points sit at UTC midnight, so format in UTC to avoid a local-tz
-  // shift (e.g. midnight UTC rendering as "1am"). Date-only, 3-letter month.
+  // Axis: date-only, 3-letter month, in UTC (daily points sit at UTC midnight,
+  // so local rendering would show a misleading "1am"). Time is left off the
+  // axis to keep it slim.
   const fmtAxis = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
-  const fmtHover = new Intl.DateTimeFormat('en-US', {
+
+  // Hover popup: on-demand detail, so it can afford to show the date plus both
+  // UTC and local time.
+  const fmtHoverDate = new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   })
+  const fmtUtcTime = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const fmtLocalTime = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZoneName: 'short',
+  })
+  const fmtHover = (ms: number) =>
+    `${fmtHoverDate.format(ms)} · ${fmtUtcTime.format(ms)} UTC · ${fmtLocalTime.format(ms)}`
 
   function options(width: number): uPlot.Options {
     return {
@@ -27,8 +45,8 @@
       scales: { x: { time: true } },
       legend: { show: true },
       series: [
-        // Hover readout shows the full date (no time — data is daily).
-        { value: (_u, v) => (v == null ? '' : fmtHover.format(v * 1000)) },
+        // Hover readout: full date + both UTC and local time (on-demand detail).
+        { value: (_u, v) => (v == null ? '' : fmtHover(v * 1000)) },
         { label: 'Opened', stroke: '#5ac8fa', width: 2, points: { show: false } },
         { label: 'Closed', stroke: '#79d18a', width: 2, points: { show: false } },
       ],
