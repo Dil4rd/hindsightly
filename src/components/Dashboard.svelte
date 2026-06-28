@@ -1,16 +1,25 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { untrack } from 'svelte'
   import { TodoistClient } from '../lib/todoist/client'
   import type { ActivityEvent, CompletedItem, Project } from '../lib/todoist/types'
   import { presetWindow, type Filters, type TimePreset } from '../lib/stats/filters'
   import { computeMetrics } from '../lib/stats/metrics'
   import { granularityFor, trendSeries } from '../lib/stats/series'
   import { buildTree, descendantIds } from '../lib/stats/tree'
+  import {
+    accountKey,
+    loadCache,
+    mergeById,
+    saveCache,
+    stripCompleted,
+    stripEvent,
+  } from '../lib/todoist/cache'
   import StatCard from './StatCard.svelte'
   import ProjectTree from './ProjectTree.svelte'
   import TrendChart from './TrendChart.svelte'
 
-  let { token, onLock }: { token: string; onLock: () => void } = $props()
+  let { token, cacheKey, onLock }: { token: string; cacheKey: CryptoKey; onLock: () => void } =
+    $props()
 
   const now = new Date()
   const client = $derived(new TodoistClient(token))
@@ -27,49 +36,97 @@
   let loading = $state(true)
   let error = $state<string | null>(null)
 
+  // sync bookkeeping (non-reactive)
   let reqId = 0
+  let fetchedSince: number | null = null // earliest event ms held in memory
+  let account = ''
+  let hydrated = false
+  let toppedUp = false
+  let projectsFetched = false
 
-  // Projects load once.
-  onMount(async () => {
-    try {
-      projects = await client.listProjects()
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e)
-    }
-  })
-
-  // Activity + completed refetch when the time window changes. Only `preset` is
-  // read synchronously here, so this effect re-runs solely on preset change.
+  // Re-runs only on preset change; untrack() keeps sync()'s state reads from
+  // becoming dependencies (which would loop).
   $effect(() => {
     const p = preset
-    void loadActivity(p)
+    untrack(() => void sync(p))
   })
 
-  // Earliest timestamp already fetched. A larger fetch is a superset of every
-  // smaller window, so shrinking the range (or revisiting) needs no refetch —
-  // the derived metrics/series just re-filter the in-memory data.
-  let fetchedSince: number | null = null
+  const newest = <T,>(arr: T[], f: (x: T) => string): number =>
+    arr.reduce((m, x) => Math.max(m, Date.parse(f(x)) || 0), 0)
 
-  async function loadActivity(p: TimePreset) {
-    const { since, until } = presetWindow(p, now)
-    const sinceMs = since.getTime()
-    if (fetchedSince != null && sinceMs >= fetchedSince) return // cached superset covers it
+  async function persist() {
+    if (fetchedSince == null || !account) return
+    try {
+      await saveCache(account, cacheKey, { fetchedSince, events, completed, projects, savedAt: Date.now() })
+    } catch {
+      /* cache is best-effort */
+    }
+  }
 
+  async function sync(p: TimePreset) {
     const id = ++reqId
     loading = true
     error = null
     try {
-      const [ev, cp] = await Promise.all([client.listActivities(since), client.listCompleted(since, until)])
+      // 1) Hydrate from the encrypted cache once (instant on reload).
+      if (!hydrated) {
+        hydrated = true
+        account = await accountKey(token)
+        const c = await loadCache(account, cacheKey)
+        if (c) {
+          events = c.events
+          completed = c.completed
+          projects = c.projects
+          fetchedSince = c.fetchedSince
+        }
+      }
+
+      // 2) Refresh projects once per session (keeps the tree current).
+      if (!projectsFetched) {
+        projectsFetched = true
+        projects = await client.listProjects()
+      }
+
+      // 3) Top-up activity newer than what we have (once per session).
+      if (!toppedUp && fetchedSince != null) {
+        toppedUp = true
+        const evFrom = newest(events, (e) => e.event_date) || fetchedSince
+        const cpFrom = newest(completed, (c) => c.completed_at) || fetchedSince
+        const [ev, cp] = await Promise.all([
+          client.listActivities(new Date(evFrom)),
+          client.listCompleted(new Date(cpFrom), now),
+        ])
+        events = mergeById(events, ev.map(stripEvent))
+        completed = mergeById(completed, cp.map(stripCompleted))
+      }
+
+      // 4) Extend the range when the window reaches earlier than fetched.
+      const { since, until } = presetWindow(p, now)
+      const sinceMs = since.getTime()
+      if (fetchedSince == null || sinceMs < fetchedSince) {
+        toppedUp = true // a full fetch already includes the newest events
+        const [ev, cp] = await Promise.all([
+          client.listActivities(since),
+          client.listCompleted(since, until),
+        ])
+        events = mergeById(events, ev.map(stripEvent))
+        completed = mergeById(completed, cp.map(stripCompleted))
+        fetchedSince = sinceMs
+      }
+
       if (id !== reqId) return
-      events = ev
-      completed = cp
-      fetchedSince = sinceMs
+      await persist()
     } catch (e) {
       if (id !== reqId) return
       error = e instanceof Error ? e.message : String(e)
     } finally {
       if (id === reqId) loading = false
     }
+  }
+
+  function refresh() {
+    toppedUp = false // force a fresh top-up
+    void sync(preset)
   }
 
   const win = $derived(presetWindow(preset, now))
@@ -107,7 +164,7 @@
   <header>
     <h1>Hindsight</h1>
     <div class="actions">
-      <button class="ghost" onclick={() => loadActivity(preset)} disabled={loading}>
+      <button class="ghost" onclick={refresh} disabled={loading}>
         {loading ? 'Loading…' : 'Refresh'}
       </button>
       <button class="ghost" onclick={onLock}>Lock</button>

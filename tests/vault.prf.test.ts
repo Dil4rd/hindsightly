@@ -93,7 +93,7 @@ describe('vault PRF round-trip (simulated authenticator)', () => {
       expect(v?.version).toBe(2)
       expect(v?.wrapped.length).toBe(1)
 
-      expect(await unlock(v!)).toBe(token)
+      expect((await unlock(v!)).token).toBe(token)
     })
   }
 
@@ -109,6 +109,6 @@ describe('vault PRF round-trip (simulated authenticator)', () => {
 
     const v = await loadVault()
     expect(v?.wrapped.length).toBe(2)
-    expect(await unlock(v!)).toBe('tok')
+    expect((await unlock(v!)).token).toBe('tok')
   })
 })

@@ -9,7 +9,7 @@
   } from '../lib/auth/vault'
   import { isWebAuthnAvailable } from '../lib/auth/webauthn'
 
-  let { onUnlocked }: { onUnlocked: (token: string) => void } = $props()
+  let { onUnlocked }: { onUnlocked: (token: string, cacheKey: CryptoKey) => void } = $props()
 
   const supported = isWebAuthnAvailable()
 
@@ -44,13 +44,22 @@
   const doEnroll = () =>
     run(async () => {
       const token = tokenInput.trim()
-      vault = await enroll(token, label.trim() || 'My passkey', new Date().toISOString())
-      // We already hold the plaintext token here — no need for a second
-      // ceremony. The unlock path is exercised on the next session.
-      onUnlocked(token)
+      // We already hold the plaintext token here — no second ceremony needed;
+      // the unlock path is exercised on the next session.
+      const { vault: v, cacheKey } = await enroll(
+        token,
+        label.trim() || 'My passkey',
+        new Date().toISOString(),
+      )
+      vault = v
+      onUnlocked(token, cacheKey)
     })
 
-  const doUnlock = () => run(async () => onUnlocked(await unlock(vault!)))
+  const doUnlock = () =>
+    run(async () => {
+      const { token, cacheKey } = await unlock(vault!)
+      onUnlocked(token, cacheKey)
+    })
 
   const doReset = () =>
     run(async () => {

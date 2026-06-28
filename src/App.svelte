@@ -2,12 +2,23 @@
   import Unlock from './components/Unlock.svelte'
   import Dashboard from './components/Dashboard.svelte'
 
-  // The decrypted token lives only here, in memory, for the page's lifetime.
+  // The decrypted token and the cache key live only here, in memory, for the
+  // page's lifetime.
   let token = $state<string | null>(null)
+  let cacheKey = $state<CryptoKey | null>(null)
+
+  function onUnlocked(t: string, k: CryptoKey) {
+    token = t
+    cacheKey = k
+  }
+  function lock() {
+    token = null
+    cacheKey = null
+  }
 </script>
 
-{#if token}
-  <Dashboard {token} onLock={() => (token = null)} />
+{#if token && cacheKey}
+  <Dashboard {token} {cacheKey} onLock={lock} />
 {:else}
-  <Unlock onUnlocked={(t) => (token = t)} />
+  <Unlock {onUnlocked} />
 {/if}
