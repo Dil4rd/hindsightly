@@ -7,7 +7,7 @@
     unlock,
     type Vault,
   } from '../lib/auth/vault'
-  import { diagnosePrf, isWebAuthnAvailable } from '../lib/auth/webauthn'
+  import { isWebAuthnAvailable } from '../lib/auth/webauthn'
 
   let { onUnlocked }: { onUnlocked: (token: string) => void } = $props()
 
@@ -58,13 +58,6 @@
       vault = undefined
       tokenInput = ''
     })
-
-  let diag = $state<string | null>(null)
-  const doDiagnose = () =>
-    run(async () => {
-      const v = await loadVault()
-      diag = await diagnosePrf(v?.wrapped.map((w) => w.credentialId) ?? [])
-    })
 </script>
 
 <main class="unlock">
@@ -101,12 +94,6 @@
   {/if}
 
   {#if error}<p class="error">{error}</p>{/if}
-
-  <details class="diag">
-    <summary>Trouble unlocking? Run PRF diagnostic</summary>
-    <button class="link" onclick={doDiagnose} disabled={busy}>Run PRF diagnostic</button>
-    {#if diag}<pre>{diag}</pre>{/if}
-  </details>
 </main>
 
 <style>
@@ -120,19 +107,5 @@
   }
   h1 {
     margin-top: 0;
-  }
-  .diag {
-    margin-top: 1.5rem;
-    font-size: 0.8rem;
-    color: var(--muted);
-  }
-  .diag pre {
-    white-space: pre-wrap;
-    word-break: break-all;
-    background: #0e0c0b;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.6rem;
-    color: var(--fg);
   }
 </style>
