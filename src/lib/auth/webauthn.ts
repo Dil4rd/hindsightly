@@ -35,6 +35,21 @@ export function isWebAuthnAvailable(): boolean {
   )
 }
 
+/**
+ * Normalize a PRF result to an ArrayBuffer. Authenticators/passkey providers
+ * return it as an ArrayBuffer or a typed-array view; anything else (or absent)
+ * yields null so callers can fall back or fail with a clear message — instead
+ * of WebCrypto's cryptic "Key data must be a BufferSource".
+ */
+function toArrayBuffer(v: unknown): ArrayBuffer | null {
+  if (v instanceof ArrayBuffer) return v
+  if (ArrayBuffer.isView(v)) {
+    const view = v as ArrayBufferView
+    return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) as ArrayBuffer
+  }
+  return null
+}
+
 // --- registration -----------------------------------------------------------
 
 export interface NewCredential {
@@ -69,15 +84,13 @@ export async function registerCredential(label: string): Promise<NewCredential> 
 
   const credentialId = b64uEncode(cred.rawId)
   const ext = cred.getClientExtensionResults() as PrfExtensionResults
-  let prfOutput = ext?.prf?.results?.first
 
-  // Most authenticators do NOT return PRF at create() — get it via an assertion.
+  // Some providers (e.g. 1Password) return PRF at create(); many don't, or
+  // return a non-buffer shape. Accept only a real buffer, else get it via an
+  // assertion ceremony.
+  let prfOutput = toArrayBuffer(ext?.prf?.results?.first)
   if (!prfOutput) {
-    const r = await getPrfOutput([{ id: credentialId, salt: b64uEncode(salt) }])
-    prfOutput = r.prfOutput
-  }
-  if (!prfOutput) {
-    throw new Error('This authenticator does not support the PRF extension.')
+    prfOutput = (await getPrfOutput([{ id: credentialId, salt: b64uEncode(salt) }])).prfOutput
   }
 
   return { credentialId, prfOutput, salt: b64uEncode(salt) }
@@ -117,14 +130,14 @@ export async function getPrfOutput(
   if (!assertion) throw new Error('Unlock was cancelled.')
 
   const ext = assertion.getClientExtensionResults() as PrfExtensionResults
-  const prfOutput = ext?.prf?.results?.first
+  const prfOutput = toArrayBuffer(ext?.prf?.results?.first)
   if (!prfOutput) {
-    throw new Error('No PRF output returned (authenticator lacks PRF support).')
+    throw new Error('No usable PRF output returned (passkey/authenticator lacks PRF support).')
   }
   return { credentialId: b64uEncode(assertion.rawId), prfOutput }
 }
 
 // PRF results aren't in the stock DOM typings yet.
 interface PrfExtensionResults {
-  prf?: { results?: { first?: ArrayBuffer } }
+  prf?: { results?: { first?: unknown } }
 }
