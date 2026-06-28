@@ -96,7 +96,14 @@
       legend: { show: false },
       plugins: [weekendPlugin()],
       hooks: { setCursor: [onCursor] },
-      cursor: { points: { show: true } },
+      cursor: {
+        points: {
+          show: true,
+          size: 8,
+          fill: (_u, i) => (i === 1 ? OPENED : CLOSED),
+          stroke: (_u, i) => (i === 1 ? OPENED : CLOSED),
+        },
+      },
       series: [
         {},
         { stroke: OPENED, width: 2, points: { show: false } },
