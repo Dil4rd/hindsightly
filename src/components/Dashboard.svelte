@@ -118,7 +118,17 @@
     <p class="error">{error}</p>
   {/if}
 
-  <div class="layout">
+  <p class="status" aria-live="polite">
+    {#if loading}
+      <span class="spinner" aria-hidden="true"></span>
+      Loading &amp; analyzing the last {preset}…
+    {:else}
+      {events.length.toLocaleString()} events · {completed.length.toLocaleString()} completed ·
+      {projects.length} projects
+    {/if}
+  </p>
+
+  <div class="layout" class:dim={loading}>
     <aside>
       <h2>Projects</h2>
       <ProjectTree roots={tree} selectedId={selectedProjectId} onSelect={(id) => (selectedProjectId = id)} />
@@ -204,11 +214,37 @@
     background: var(--accent);
     color: #fff;
   }
+  .status {
+    margin: 0 0 1rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    min-height: 1.2em;
+  }
+  .spinner {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.4em;
+    border: 2px solid var(--muted);
+    border-top-color: transparent;
+    border-radius: 50%;
+    vertical-align: -0.1em;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
   .layout {
     display: grid;
     grid-template-columns: 14rem 1fr;
     gap: 1.5rem;
     align-items: start;
+    transition: opacity 0.15s ease;
+  }
+  .layout.dim {
+    opacity: 0.4;
   }
   aside {
     position: sticky;
