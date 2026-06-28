@@ -38,12 +38,43 @@
   const fmtHover = (ms: number) =>
     `${fmtHoverDate.format(ms)} · ${fmtUtcTime.format(ms)} UTC · ${fmtLocalTime.format(ms)}`
 
+  const DAY_SEC = 86_400
+
+  // Shade Sat/Sun columns behind the series so weekend dips read as expected
+  // seasonality rather than a real drop. Weekday is by UTC (matches bucketing).
+  function weekendPlugin(): uPlot.Plugin {
+    return {
+      hooks: {
+        drawClear: (u) => {
+          const xs = u.data[0] as number[]
+          if (!xs?.length) return
+          const { ctx } = u
+          const { left, top, width, height } = u.bbox
+          ctx.save()
+          ctx.beginPath()
+          ctx.rect(left, top, width, height)
+          ctx.clip()
+          ctx.fillStyle = 'rgba(124, 132, 170, 0.10)'
+          for (const sec of xs) {
+            const dow = new Date(sec * 1000).getUTCDay()
+            if (dow !== 0 && dow !== 6) continue
+            const x0 = u.valToPos(sec, 'x', true)
+            const x1 = u.valToPos(sec + DAY_SEC, 'x', true)
+            ctx.fillRect(x0, top, x1 - x0, height)
+          }
+          ctx.restore()
+        },
+      },
+    }
+  }
+
   function options(width: number): uPlot.Options {
     return {
       width,
       height: 240,
       scales: { x: { time: true } },
       legend: { show: true },
+      plugins: [weekendPlugin()],
       series: [
         // Hover readout: full date + both UTC and local time (on-demand detail).
         { value: (_u, v) => (v == null ? '' : fmtHover(v * 1000)) },
