@@ -45,16 +45,25 @@
     void loadActivity(p)
   })
 
+  // Earliest timestamp already fetched. A larger fetch is a superset of every
+  // smaller window, so shrinking the range (or revisiting) needs no refetch —
+  // the derived metrics/series just re-filter the in-memory data.
+  let fetchedSince: number | null = null
+
   async function loadActivity(p: TimePreset) {
+    const { since, until } = presetWindow(p, now)
+    const sinceMs = since.getTime()
+    if (fetchedSince != null && sinceMs >= fetchedSince) return // cached superset covers it
+
     const id = ++reqId
     loading = true
     error = null
     try {
-      const { since, until } = presetWindow(p, now)
       const [ev, cp] = await Promise.all([client.listActivities(since), client.listCompleted(since, until)])
       if (id !== reqId) return
       events = ev
       completed = cp
+      fetchedSince = sinceMs
     } catch (e) {
       if (id !== reqId) return
       error = e instanceof Error ? e.message : String(e)

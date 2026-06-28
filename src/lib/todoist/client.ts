@@ -60,7 +60,7 @@ export class TodoistClient {
     const sinceMs = since.getTime()
     const evs = await this.paginate<ActivityEvent>(
       '/api/v1/activities',
-      { limit: 100, object_type: 'item' },
+      { limit: 200, object_type: 'item' }, // 200 is the server cap
       (p) => p.results ?? [],
       (items) =>
         items.length > 0 && Date.parse(items[items.length - 1].event_date) < sinceMs,
