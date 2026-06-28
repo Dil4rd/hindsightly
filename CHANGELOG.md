@@ -8,6 +8,12 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ## [Unreleased]
 
+### Fixed
+
+- Year view no longer errors out, and mean-time-to-complete now covers the full
+  window: the completed-tasks fetch is chunked under Todoist's 3-month
+  date-range cap (chunks fetched in parallel, merged).
+
 ## [0.1.0] - 2026-06-28
 
 Initial release.

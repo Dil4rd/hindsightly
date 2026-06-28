@@ -68,14 +68,28 @@ export class TodoistClient {
     return evs.filter((e) => Date.parse(e.event_date) >= sinceMs)
   }
 
-  // NOTE: the completed endpoint caps each request at a ~3-month range; for
-  // windows longer than that we'd chunk the [since, until] interval. Default
-  // (week/month) is well within the cap.
-  listCompleted(since: Date, until: Date): Promise<CompletedItem[]> {
-    return this.paginate<CompletedItem>(
-      '/api/v1/tasks/completed/by_completion_date',
-      { since: since.toISOString(), until: until.toISOString(), limit: 200 },
-      (p) => p.items ?? [],
+  // The completed endpoint rejects any request whose date range exceeds ~3
+  // months (HTTP 400). So split [since, until] into <=84-day chunks, fetch them
+  // in parallel, and merge (deduped by id in case of boundary overlap).
+  async listCompleted(since: Date, until: Date): Promise<CompletedItem[]> {
+    const CHUNK_MS = 84 * 86_400_000
+    const ranges: Array<[Date, Date]> = []
+    for (let start = since.getTime(); start < until.getTime(); start += CHUNK_MS) {
+      ranges.push([new Date(start), new Date(Math.min(start + CHUNK_MS, until.getTime()))])
+    }
+
+    const chunks = await Promise.all(
+      ranges.map(([s, u]) =>
+        this.paginate<CompletedItem>(
+          '/api/v1/tasks/completed/by_completion_date',
+          { since: s.toISOString(), until: u.toISOString(), limit: 200 },
+          (p) => p.items ?? [],
+        ),
+      ),
     )
+
+    const byId = new Map<string, CompletedItem>()
+    for (const item of chunks.flat()) byId.set(item.id, item)
+    return [...byId.values()]
   }
 }

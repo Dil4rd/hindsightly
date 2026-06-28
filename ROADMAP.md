@@ -17,9 +17,6 @@ Turn the raw metrics into answers to the four retro questions:
 
 ## Later
 
-- [ ] **MTTC over long windows** (correctness) — the completed endpoint caps each
-      request at ~3 months, so quarter/year mean-time-to-complete is currently
-      truncated; chunk the range to cover it fully.
 - [ ] **Recurring toggle** — let the user include or exclude recurring completions
       from `closed`.
 
