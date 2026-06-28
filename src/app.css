@@ -1,0 +1,65 @@
+:root {
+  --bg: #14110f;
+  --panel: #1e1a17;
+  --fg: #f3ede7;
+  --muted: #9a8f84;
+  --accent: #e44332; /* Todoist red */
+  --border: #2e2823;
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  text-decoration: underline;
+  padding: 0.4rem;
+}
+
+input {
+  font: inherit;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0e0c0b;
+  color: var(--fg);
+}
+
+label {
+  display: block;
+  margin: 0.75rem 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.error {
+  color: #ff8a7a;
+  font-size: 0.9rem;
+}
