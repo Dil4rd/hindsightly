@@ -1,7 +1,7 @@
 // Aggregate filtered activity events + completed items into the final metrics.
 
 import type { ActivityEvent, CompletedItem } from '../todoist/types'
-import { classify } from './events'
+import { classify, isRecurringCompletion } from './events'
 import { completedInScope, eventInScope, type Filters } from './filters'
 import { METRIC_BUCKETS, type MetricBucket, type Metrics } from './types'
 
@@ -15,9 +15,11 @@ export function computeMetrics(
   filters: Filters,
 ): Metrics {
   const counts = emptyCounts()
+  let recurringClosed = 0
   for (const ev of events) {
     if (!eventInScope(ev, filters)) continue
     for (const bucket of classify(ev)) counts[bucket]++
+    if (isRecurringCompletion(ev)) recurringClosed++
   }
 
   // Mean time to complete: completed_at - added_at over in-scope completed items.
@@ -33,5 +35,5 @@ export function computeMetrics(
     }
   }
 
-  return { counts, meanTimeToCompleteMs: n ? total / n : null }
+  return { counts, recurringClosed, meanTimeToCompleteMs: n ? total / n : null }
 }

@@ -23,9 +23,8 @@ export const METRIC_BUCKETS: MetricBucket[] = [
 
 export interface Metrics {
   counts: Record<MetricBucket, number>
+  /** Of `counts.closed`, how many were recurring-task occurrences (not terminal). */
+  recurringClosed: number
   /** mean(completed_at - added_at) over completed items, ms; null if none. */
   meanTimeToCompleteMs: number | null
 }
-
-// NOTE: recurring-task handling is deferred — recurring auto-advances will
-// currently land in `postponed`. Tracked for a later stage.

@@ -17,6 +17,17 @@ export function toDay(due: string | null | undefined): string | null {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : null
 }
 
+/**
+ * A completed event for a recurring task — an occurrence completion, not a
+ * terminal close. Verified against live data: the recurrence advance is encoded
+ * in the completed event itself (not a separate `updated` due-move), so it does
+ * NOT inflate postponed. It is a subset of `closed`, surfaced separately so
+ * habit/maintenance work can be told apart from one-off project progress.
+ */
+export function isRecurringCompletion(ev: ActivityEvent): boolean {
+  return ev.object_type === 'item' && ev.event_type === 'completed' && !!ev.extra_data?.is_recurring
+}
+
 export function classify(ev: ActivityEvent): MetricBucket[] {
   if (ev.object_type !== 'item') return []
   const x = ev.extra_data ?? {}

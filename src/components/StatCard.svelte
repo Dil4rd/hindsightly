@@ -1,11 +1,16 @@
 <script lang="ts">
-  let { label, value, accent = false }: { label: string; value: string | number; accent?: boolean } =
-    $props()
+  let {
+    label,
+    value,
+    sub = '',
+    accent = false,
+  }: { label: string; value: string | number; sub?: string; accent?: boolean } = $props()
 </script>
 
 <div class="card" class:accent>
   <div class="value">{value}</div>
   <div class="label">{label}</div>
+  {#if sub}<div class="sub">{sub}</div>{/if}
 </div>
 
 <style>
@@ -28,5 +33,10 @@
     font-size: 0.8rem;
     color: var(--muted);
     text-transform: lowercase;
+  }
+  .sub {
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    color: var(--accent);
   }
 </style>

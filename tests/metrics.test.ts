@@ -79,4 +79,14 @@ describe('computeMetrics', () => {
     const m = computeMetrics([], [], filters())
     expect(m.meanTimeToCompleteMs).toBeNull()
   })
+
+  it('tracks recurring completions as a subset of closed', () => {
+    const evs: ActivityEvent[] = [
+      ev('completed', '2026-06-10T10:00:00Z', 'A'),
+      ev('completed', '2026-06-11T10:00:00Z', 'A', { is_recurring: true }),
+    ]
+    const m = computeMetrics(evs, [], filters())
+    expect(m.counts.closed).toBe(2)
+    expect(m.recurringClosed).toBe(1)
+  })
 })

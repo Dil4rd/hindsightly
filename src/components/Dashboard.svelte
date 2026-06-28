@@ -127,7 +127,12 @@
     <main>
       <section class="cards">
         <StatCard label="opened" value={metrics.counts.opened} />
-        <StatCard label="closed" value={metrics.counts.closed} accent />
+        <StatCard
+          label="closed"
+          value={metrics.counts.closed}
+          sub={metrics.recurringClosed ? `${metrics.recurringClosed} recurring` : ''}
+          accent
+        />
         <StatCard label="postponed" value={metrics.counts.postponed} />
         <StatCard label="rescheduled" value={metrics.counts.rescheduled} />
         <StatCard label="scheduled" value={metrics.counts.scheduled} />
