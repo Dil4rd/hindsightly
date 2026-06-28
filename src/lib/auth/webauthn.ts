@@ -50,18 +50,25 @@ function toArrayBuffer(v: unknown): ArrayBuffer | null {
   return null
 }
 
+// Fixed app-wide PRF input ("salt"). Not secret — it's a domain-separation
+// label. The PRF output is still unique per credential (each credential's
+// secret differs), so one shared salt suffices and lets us use the most widely
+// supported request shape: top-level `eval` (1Password doesn't honor
+// `evalByCredential`).
+const PRF_SALT = new TextEncoder().encode('hindsight:prf:v1')
+
+const prfExtension = () =>
+  ({ prf: { eval: { first: PRF_SALT } } }) as AuthenticationExtensionsClientInputs
+
 // --- registration -----------------------------------------------------------
 
 export interface NewCredential {
   credentialId: string // base64url
   prfOutput: ArrayBuffer
-  salt: string // base64url — PRF input for this credential
 }
 
-/** Register a new passkey and obtain its PRF output for a fresh random salt. */
+/** Register a new passkey and obtain its PRF output. */
 export async function registerCredential(label: string): Promise<NewCredential> {
-  const salt = randomBytes(32)
-
   const cred = (await navigator.credentials.create({
     publicKey: {
       rp: { name: RP_NAME, id: location.hostname },
@@ -75,8 +82,8 @@ export async function registerCredential(label: string): Promise<NewCredential> 
         residentKey: 'required',
         userVerification: 'required',
       },
-      // Enable PRF; some authenticators also evaluate it at creation time.
-      extensions: { prf: { eval: { first: salt } } } as AuthenticationExtensionsClientInputs,
+      // Enable PRF; some providers also evaluate it at creation time.
+      extensions: prfExtension(),
     },
   })) as PublicKeyCredential | null
 
@@ -85,15 +92,14 @@ export async function registerCredential(label: string): Promise<NewCredential> 
   const credentialId = b64uEncode(cred.rawId)
   const ext = cred.getClientExtensionResults() as PrfExtensionResults
 
-  // Some providers (e.g. 1Password) return PRF at create(); many don't, or
-  // return a non-buffer shape. Accept only a real buffer, else get it via an
-  // assertion ceremony.
+  // Accept a create()-time PRF result only if it's a real buffer; otherwise
+  // obtain it via an assertion ceremony.
   let prfOutput = toArrayBuffer(ext?.prf?.results?.first)
   if (!prfOutput) {
-    prfOutput = (await getPrfOutput([{ id: credentialId, salt: b64uEncode(salt) }])).prfOutput
+    prfOutput = (await getPrfOutput([credentialId])).prfOutput
   }
 
-  return { credentialId, prfOutput, salt: b64uEncode(salt) }
+  return { credentialId, prfOutput }
 }
 
 // --- assertion (unlock) -----------------------------------------------------
@@ -104,26 +110,20 @@ export interface PrfResult {
 }
 
 /**
- * Run an assertion across the given credentials and return the PRF output of
- * whichever one the user picked. Each credential carries its own salt, passed
- * via `evalByCredential` so the browser evaluates PRF for the chosen one only.
+ * Run an assertion across the given credential ids and return the PRF output of
+ * whichever one the user picked, evaluated against the fixed app PRF salt.
  */
-export async function getPrfOutput(
-  creds: { id: string; salt: string }[],
-): Promise<PrfResult> {
-  const evalByCredential: Record<string, { first: BufferSource }> = {}
-  for (const c of creds) evalByCredential[c.id] = { first: b64uDecode(c.salt) }
-
+export async function getPrfOutput(credentialIds: string[]): Promise<PrfResult> {
   const assertion = (await navigator.credentials.get({
     publicKey: {
       challenge: randomBytes(32),
       rpId: location.hostname,
       userVerification: 'required',
-      allowCredentials: creds.map((c) => ({
+      allowCredentials: credentialIds.map((id) => ({
         type: 'public-key' as const,
-        id: b64uDecode(c.id),
+        id: b64uDecode(id),
       })),
-      extensions: { prf: { evalByCredential } } as AuthenticationExtensionsClientInputs,
+      extensions: prfExtension(),
     },
   })) as PublicKeyCredential | null
 
