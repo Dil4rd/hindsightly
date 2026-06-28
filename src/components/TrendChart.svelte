@@ -110,7 +110,7 @@
           grid: { stroke: '#2e2823' },
           ticks: { stroke: '#2e2823' },
           incrs: AXIS_INCRS,
-          space: 55, // min px per tick → uPlot thins ticks so labels never overlap
+          space: 44, // min px per tick (narrow 2-line labels → denser ticks)
           size: 42, // room for two lines (date + weekday) in day view
           values: (_u, splits) =>
             splits.map((s) => {
