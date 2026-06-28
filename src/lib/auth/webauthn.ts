@@ -47,6 +47,11 @@ function toArrayBuffer(v: unknown): ArrayBuffer | null {
     const view = v as ArrayBufferView
     return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) as ArrayBuffer
   }
+  // 1Password returns the PRF result as a plain number[] (not spec-compliant
+  // ArrayBuffer) — accept that shape too.
+  if (Array.isArray(v) && v.every((n) => typeof n === 'number')) {
+    return new Uint8Array(v as number[]).buffer
+  }
   return null
 }
 
