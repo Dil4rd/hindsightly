@@ -30,14 +30,6 @@
     hour12: false,
   })
 
-  // Axis labels (day view): weekday + date, e.g. "Sat, Jun 21".
-  const fmtAxisDay = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'UTC',
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
-
   const fmtHover = (ms: number) =>
     series.granularity === 'week'
       ? `Week of ${fmtDate.format(ms)}`
@@ -47,6 +39,8 @@
   // Whole-day tick increments only (prevents uPlot from placing 2 sub-day ticks
   // on the same calendar day, which produced duplicate labels).
   const AXIS_INCRS = [1, 2, 3, 4, 7, 14, 30, 60, 90, 180, 365].map((d) => d * DAY_SEC)
+  // Integer-only y ticks — task counts are whole numbers (no 0.2, 0.4, …).
+  const Y_INCRS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]
 
   // Shade Sat/Sun behind the series (day view only).
   function weekendPlugin(): uPlot.Plugin {
@@ -96,12 +90,13 @@
       legend: { show: false },
       plugins: [weekendPlugin()],
       hooks: { setCursor: [onCursor] },
+      // Keep uPlot's default point-creating `show`; only customize appearance,
+      // so the hovered point is marked with a solid dot per series.
       cursor: {
         points: {
-          show: true,
-          size: 8,
+          size: (_u, i) => (i === 0 ? 0 : 8),
+          width: 0,
           fill: (_u, i) => (i === 1 ? OPENED : CLOSED),
-          stroke: (_u, i) => (i === 1 ? OPENED : CLOSED),
         },
       },
       series: [
@@ -115,10 +110,24 @@
           grid: { stroke: '#2e2823' },
           ticks: { stroke: '#2e2823' },
           incrs: AXIS_INCRS,
+          space: 55, // min px per tick → uPlot thins ticks so labels never overlap
+          size: 42, // room for two lines (date + weekday) in day view
           values: (_u, splits) =>
-            splits.map((s) => (series.granularity === 'week' ? fmtDate : fmtAxisDay).format(s * 1000)),
+            splits.map((s) => {
+              const ms = s * 1000
+              // Day view: date on top, weekday below. Week view: just the date.
+              return series.granularity === 'week'
+                ? fmtDate.format(ms)
+                : `${fmtDate.format(ms)}\n${fmtWeekday.format(ms)}`
+            }),
         },
-        { stroke: '#9a8f84', grid: { stroke: '#2e2823' }, ticks: { stroke: '#2e2823' } },
+        {
+          stroke: '#9a8f84',
+          grid: { stroke: '#2e2823' },
+          ticks: { stroke: '#2e2823' },
+          incrs: Y_INCRS, // integers only
+          values: (_u, splits) => splits.map((v) => (v == null ? '' : String(v))),
+        },
       ],
     }
   }
