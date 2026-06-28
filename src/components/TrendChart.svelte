@@ -30,12 +30,23 @@
     hour12: false,
   })
 
+  // Axis labels (day view): weekday + date, e.g. "Sat, Jun 21".
+  const fmtAxisDay = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+
   const fmtHover = (ms: number) =>
     series.granularity === 'week'
       ? `Week of ${fmtDate.format(ms)}`
       : `${fmtWeekday.format(ms)}, ${fmtDate.format(ms)} · ${fmtTime.format(ms)} UTC`
 
   const DAY_SEC = 86_400
+  // Whole-day tick increments only (prevents uPlot from placing 2 sub-day ticks
+  // on the same calendar day, which produced duplicate labels).
+  const AXIS_INCRS = [1, 2, 3, 4, 7, 14, 30, 60, 90, 180, 365].map((d) => d * DAY_SEC)
 
   // Shade Sat/Sun behind the series (day view only).
   function weekendPlugin(): uPlot.Plugin {
@@ -96,7 +107,9 @@
           stroke: '#9a8f84',
           grid: { stroke: '#2e2823' },
           ticks: { stroke: '#2e2823' },
-          values: (_u, splits) => splits.map((s) => fmtDate.format(s * 1000)),
+          incrs: AXIS_INCRS,
+          values: (_u, splits) =>
+            splits.map((s) => (series.granularity === 'week' ? fmtDate : fmtAxisDay).format(s * 1000)),
         },
         { stroke: '#9a8f84', grid: { stroke: '#2e2823' }, ticks: { stroke: '#2e2823' } },
       ],
