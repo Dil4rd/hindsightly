@@ -111,7 +111,7 @@
           ticks: { stroke: '#2e2823' },
           incrs: AXIS_INCRS,
           space: 44, // min px per tick (narrow 2-line labels → denser ticks)
-          size: 42, // room for two lines (date + weekday) in day view
+          size: 54, // room for two label lines (date + weekday) without clipping
           values: (_u, splits) =>
             splits.map((s) => {
               const ms = s * 1000
