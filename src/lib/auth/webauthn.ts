@@ -137,6 +137,66 @@ export async function getPrfOutput(credentialIds: string[]): Promise<PrfResult> 
   return { credentialId: b64uEncode(assertion.rawId), prfOutput }
 }
 
+/**
+ * Diagnostic: run a get() assertion and report what the authenticator returns
+ * for the PRF extension — WITHOUT exposing secrets (no token, no PRF bytes, no
+ * full credential id). Safe to display/share. Used to debug PRF support.
+ */
+export async function diagnosePrf(credentialIds: string[]): Promise<string> {
+  const out: Record<string, unknown> = { origin: location.origin, rpId: location.hostname }
+  try {
+    out.webauthnAvailable = isWebAuthnAvailable()
+    const PKC = PublicKeyCredential as unknown as {
+      getClientCapabilities?: () => Promise<Record<string, boolean>>
+    }
+    if (PKC.getClientCapabilities) {
+      try {
+        out.clientCapabilities = await PKC.getClientCapabilities()
+      } catch (e) {
+        out.clientCapabilitiesErr = String(e)
+      }
+    }
+    out.askedCredentials = credentialIds.length
+    out.askedCredIdPrefix = credentialIds[0]?.slice(0, 10) ?? null
+
+    const assertion = (await navigator.credentials.get({
+      publicKey: {
+        challenge: randomBytes(32),
+        rpId: location.hostname,
+        userVerification: 'required',
+        allowCredentials: credentialIds.map((id) => ({
+          type: 'public-key' as const,
+          id: b64uDecode(id),
+        })),
+        extensions: prfExtension(),
+      },
+    })) as PublicKeyCredential | null
+
+    out.gotAssertion = !!assertion
+    if (assertion) {
+      out.usedCredIdPrefix = b64uEncode(assertion.rawId).slice(0, 10)
+      out.usedCredMatchesAsked = b64uEncode(assertion.rawId) === credentialIds[0]
+      const ext = assertion.getClientExtensionResults() as PrfExtensionResults & {
+        prf?: { enabled?: boolean }
+      }
+      out.prfKeyPresent = ext ? 'prf' in ext : false
+      out.prfEnabled = ext?.prf?.enabled
+      out.resultsPresent = !!ext?.prf?.results
+      const first = ext?.prf?.results?.first
+      out.firstType = Object.prototype.toString.call(first)
+      out.firstByteLength =
+        first instanceof ArrayBuffer
+          ? first.byteLength
+          : ArrayBuffer.isView(first)
+            ? (first as ArrayBufferView).byteLength
+            : null
+    }
+  } catch (e) {
+    out.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
+  }
+  return JSON.stringify(out, null, 2)
+}
+
 // PRF results aren't in the stock DOM typings yet.
 interface PrfExtensionResults {
   prf?: { results?: { first?: unknown } }
