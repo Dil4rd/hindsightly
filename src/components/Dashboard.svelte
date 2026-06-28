@@ -17,6 +17,7 @@
   import StatCard from './StatCard.svelte'
   import ProjectTree from './ProjectTree.svelte'
   import TrendChart from './TrendChart.svelte'
+  import Logo from './Logo.svelte'
 
   let { token, cacheKey, onLock }: { token: string; cacheKey: CryptoKey; onLock: () => void } =
     $props()
@@ -162,7 +163,7 @@
 
 <div class="dashboard">
   <header>
-    <h1>Hindsight</h1>
+    <h1><span class="logo"><Logo size={22} /></span> Hindsight</h1>
     <div class="actions">
       <button class="ghost" onclick={refresh} disabled={loading}>
         {loading ? 'Loading…' : 'Refresh'}
@@ -272,6 +273,13 @@
   h1 {
     margin: 0;
     font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .logo {
+    display: inline-flex;
+    color: var(--accent);
   }
   h2 {
     font-size: 0.8rem;

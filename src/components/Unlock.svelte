@@ -8,6 +8,7 @@
     type Vault,
   } from '../lib/auth/vault'
   import { isWebAuthnAvailable } from '../lib/auth/webauthn'
+  import Logo from './Logo.svelte'
 
   let { onUnlocked }: { onUnlocked: (token: string, cacheKey: CryptoKey) => void } = $props()
 
@@ -70,7 +71,7 @@
 </script>
 
 <main class="unlock">
-  <h1>Hindsight</h1>
+  <h1><span class="logo"><Logo size={26} /></span> Hindsight</h1>
 
   {#if !supported}
     <p class="error">
@@ -116,5 +117,12 @@
   }
   h1 {
     margin-top: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .logo {
+    display: inline-flex;
+    color: var(--accent);
   }
 </style>
