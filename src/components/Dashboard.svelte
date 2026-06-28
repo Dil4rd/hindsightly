@@ -74,6 +74,9 @@
   const granularity = $derived(granularityFor(preset))
   const series = $derived(trendSeries(events, filters, granularity))
   const tree = $derived(buildTree(projects))
+  const hasData = $derived(
+    Object.values(metrics.counts).some((n) => n > 0) || metrics.meanTimeToCompleteMs != null,
+  )
 
   const PRESETS: TimePreset[] = ['week', 'month', 'quarter', 'year']
   const PRIORITIES: { label: string; value: number | null }[] = [
@@ -143,7 +146,7 @@
           value={metrics.counts.closed}
           sub={metrics.recurringClosed ? `${metrics.recurringClosed} recurring` : ''}
           hint="Tasks completed (checked off), including recurring-task occurrences."
-          accent
+          accent={metrics.counts.closed > 0}
         />
         <StatCard
           label="postponed"
@@ -179,7 +182,11 @@
 
       <section class="chart-wrap">
         <h2>Opened vs. closed per {granularity === 'week' ? 'week' : 'day'}</h2>
-        <TrendChart {series} />
+        {#if hasData}
+          <TrendChart {series} />
+        {:else}
+          <p class="empty">No activity in this period.</p>
+        {/if}
       </section>
     </main>
   </div>
@@ -289,6 +296,14 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1rem;
+  }
+  .empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 240px;
+    margin: 0;
+    color: var(--muted);
   }
   @media (max-width: 640px) {
     .layout {
