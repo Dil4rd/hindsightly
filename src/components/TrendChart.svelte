@@ -1,51 +1,42 @@
 <script lang="ts">
   import uPlot from 'uplot'
   import 'uplot/dist/uPlot.min.css'
-  import type { DailySeries } from '../lib/stats/series'
+  import type { TrendSeries } from '../lib/stats/series'
 
-  let { series }: { series: DailySeries } = $props()
+  let { series }: { series: TrendSeries } = $props()
 
   let el: HTMLDivElement
   let chart: uPlot | undefined
 
-  const toData = (s: DailySeries): uPlot.AlignedData => [s.t, s.opened, s.closed]
+  const toData = (s: TrendSeries): uPlot.AlignedData => [s.t, s.opened, s.closed]
 
-  // Axis: date-only, 3-letter month, in UTC (daily points sit at UTC midnight,
-  // so local rendering would show a misleading "1am"). Time is left off the
-  // axis to keep it slim.
-  const fmtAxis = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
-
-  // Hover popup: on-demand detail, so it can afford to show the date plus both
-  // UTC and local time.
-  const fmtHoverDate = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'UTC',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-  const fmtUtcTime = new Intl.DateTimeFormat('en-US', {
+  // All formatting in UTC (daily points sit at UTC midnight; local rendering
+  // would show a misleading "1am").
+  const fmtDate = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
+  const fmtWeekday = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' })
+  const fmtTime = new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
   })
-  const fmtLocalTime = new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZoneName: 'short',
-  })
+
+  // Compact hover readout: weekday + date + UTC time (day view), or the week's
+  // start (week view). Shown only while hovering.
   const fmtHover = (ms: number) =>
-    `${fmtHoverDate.format(ms)} · ${fmtUtcTime.format(ms)} UTC · ${fmtLocalTime.format(ms)}`
+    series.granularity === 'week'
+      ? `Week of ${fmtDate.format(ms)}`
+      : `${fmtWeekday.format(ms)}, ${fmtDate.format(ms)} · ${fmtTime.format(ms)} UTC`
 
   const DAY_SEC = 86_400
 
-  // Shade Sat/Sun columns behind the series so weekend dips read as expected
-  // seasonality rather than a real drop. Weekday is by UTC (matches bucketing).
+  // Shade Sat/Sun behind the series (day view only) so weekend dips read as
+  // seasonality, not a real drop.
   function weekendPlugin(): uPlot.Plugin {
     return {
       hooks: {
         drawClear: (u) => {
+          if (series.granularity !== 'day') return
           const xs = u.data[0] as number[]
           if (!xs?.length) return
           const { ctx } = u
@@ -68,6 +59,13 @@
     }
   }
 
+  // Keep the color key visible always; reveal the live values + date only while
+  // hovering (CSS toggles on this class).
+  function toggleLegend(u: uPlot) {
+    const leg = u.root.querySelector('.u-legend') as HTMLElement | null
+    if (leg) leg.classList.toggle('u-hovering', u.cursor.idx != null)
+  }
+
   function options(width: number): uPlot.Options {
     return {
       width,
@@ -75,9 +73,9 @@
       scales: { x: { time: true } },
       legend: { show: true },
       plugins: [weekendPlugin()],
+      hooks: { setCursor: [toggleLegend], ready: [toggleLegend] },
       series: [
-        // Hover readout: full date + both UTC and local time (on-demand detail).
-        { value: (_u, v) => (v == null ? '' : fmtHover(v * 1000)) },
+        { label: '', value: (_u, v) => (v == null ? '' : fmtHover(v * 1000)) },
         { label: 'Opened', stroke: '#5ac8fa', width: 2, points: { show: false } },
         { label: 'Closed', stroke: '#79d18a', width: 2, points: { show: false } },
       ],
@@ -86,7 +84,7 @@
           stroke: '#9a8f84',
           grid: { stroke: '#2e2823' },
           ticks: { stroke: '#2e2823' },
-          values: (_u, splits) => splits.map((s) => fmtAxis.format(s * 1000)),
+          values: (_u, splits) => splits.map((s) => fmtDate.format(s * 1000)),
         },
         { stroke: '#9a8f84', grid: { stroke: '#2e2823' }, ticks: { stroke: '#2e2823' } },
       ],
@@ -119,5 +117,16 @@
 <style>
   .chart {
     width: 100%;
+  }
+  /* Center the legend; always show the color key (markers + labels), but hide
+     the live values (numbers) and the x/date cell until hovering. */
+  :global(.u-legend) {
+    margin: 0.4rem auto 0;
+  }
+  :global(.u-legend .u-value) {
+    visibility: hidden;
+  }
+  :global(.u-legend.u-hovering .u-value) {
+    visibility: visible;
   }
 </style>

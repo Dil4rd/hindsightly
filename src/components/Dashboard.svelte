@@ -4,7 +4,7 @@
   import type { ActivityEvent, CompletedItem, Project } from '../lib/todoist/types'
   import { presetWindow, type Filters, type TimePreset } from '../lib/stats/filters'
   import { computeMetrics } from '../lib/stats/metrics'
-  import { dailySeries } from '../lib/stats/series'
+  import { granularityFor, trendSeries } from '../lib/stats/series'
   import { buildTree, descendantIds } from '../lib/stats/tree'
   import StatCard from './StatCard.svelte'
   import ProjectTree from './ProjectTree.svelte'
@@ -71,7 +71,8 @@
     priority,
   })
   const metrics = $derived(computeMetrics(events, completed, filters))
-  const series = $derived(dailySeries(events, filters))
+  const granularity = $derived(granularityFor(preset))
+  const series = $derived(trendSeries(events, filters, granularity))
   const tree = $derived(buildTree(projects))
 
   const PRESETS: TimePreset[] = ['week', 'month', 'quarter', 'year']
@@ -136,23 +137,48 @@
 
     <main>
       <section class="cards">
-        <StatCard label="opened" value={metrics.counts.opened} />
+        <StatCard label="opened" value={metrics.counts.opened} hint="Tasks created in this window." />
         <StatCard
           label="closed"
           value={metrics.counts.closed}
           sub={metrics.recurringClosed ? `${metrics.recurringClosed} recurring` : ''}
+          hint="Tasks completed (checked off), including recurring-task occurrences."
           accent
         />
-        <StatCard label="postponed" value={metrics.counts.postponed} />
-        <StatCard label="rescheduled" value={metrics.counts.rescheduled} />
-        <StatCard label="scheduled" value={metrics.counts.scheduled} />
-        <StatCard label="unscheduled" value={metrics.counts.unscheduled} />
-        <StatCard label="reprioritized" value={metrics.counts.reprioritized} />
-        <StatCard label="mean time to complete" value={fmtDuration(metrics.meanTimeToCompleteMs)} />
+        <StatCard
+          label="postponed"
+          value={metrics.counts.postponed}
+          hint="A task's due date moved to a LATER day."
+        />
+        <StatCard
+          label="rescheduled"
+          value={metrics.counts.rescheduled}
+          hint="A task's due date moved to an EARLIER day."
+        />
+        <StatCard
+          label="scheduled"
+          value={metrics.counts.scheduled}
+          hint="A due date was added to a task that had none."
+        />
+        <StatCard
+          label="unscheduled"
+          value={metrics.counts.unscheduled}
+          hint="A task's due date was removed (set to no date)."
+        />
+        <StatCard
+          label="reprioritized"
+          value={metrics.counts.reprioritized}
+          hint="A task's priority (P1–P4) was changed."
+        />
+        <StatCard
+          label="mean time to complete"
+          value={fmtDuration(metrics.meanTimeToCompleteMs)}
+          hint="Average time from creation to completion (non-recurring tasks)."
+        />
       </section>
 
       <section class="chart-wrap">
-        <h2>Opened vs. closed per day</h2>
+        <h2>Opened vs. closed per {granularity === 'week' ? 'week' : 'day'}</h2>
         <TrendChart {series} />
       </section>
     </main>
