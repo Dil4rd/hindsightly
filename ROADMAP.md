@@ -1,41 +1,30 @@
 # Roadmap
 
-Hindsight — a retrospective instrument for a Todoist-based GTD practice:
-"did it work out, and what should I adjust?"
+Forward-looking only — shipped work lives in [CHANGELOG.md](./CHANGELOG.md).
 
-## Done
-
-- [x] Passkey (WebAuthn PRF) security core — token encrypted at rest, no backend
-- [x] Single-file build + strict CSP; Docker build + deployment guide
-- [x] Todoist data layer (projects, completed, activity log; cursor pagination)
-- [x] Stats engine — opened / closed / postponed / rescheduled / scheduled /
-      unscheduled / reprioritized + mean time to complete
-- [x] Filters: time window, project subtree, priority
-- [x] Dashboard: stat cards + uPlot trend (weekend shading, weekly buckets)
-- [x] Recurring-task handling (`recurringClosed` subset)
-- [x] Release-on-tag workflow
-- [x] Performance: 200/page + encrypted, per-account IndexedDB cache
-      (hydrate + incremental top-up)
-- [x] Branding: logo + favicon
+Hindsight is a retrospective instrument for a Todoist-based GTD practice:
+"did it work out, and what should I adjust?" Items below earn their place by
+serving that goal; this list is curated, not a backlog dump.
 
 ## Next — the insight layer
 
-Interpret the raw signals against the four retro questions:
+Turn the raw metrics into answers to the four retro questions:
 
-- [ ] Tracking the *right* tasks? — serial postponers, never-closed/stale tasks
+- [ ] Tracking the *right* tasks? — serial postponers, never-closed / stale tasks
 - [ ] Project structure sane? — dead projects, over-stuffed projects, depth vs. use
 - [ ] Prioritizing correctly? — completion rate & MTTC by priority, priority churn
 - [ ] Executing correctly? — opened-vs-closed balance, postponement rate, trends
 
 ## Later
 
-- [ ] Recurring tasks: optional toggle to include/exclude recurring completions
-- [ ] Longer windows: chunk the completed endpoint past its ~3-month range cap
-- [ ] Custom date ranges (beyond week/month/quarter/year presets)
-- [ ] Export / share a snapshot (CSV or image)
+- [ ] **MTTC over long windows** (correctness) — the completed endpoint caps each
+      request at ~3 months, so quarter/year mean-time-to-complete is currently
+      truncated; chunk the range to cover it fully.
+- [ ] **Recurring toggle** — let the user include or exclude recurring completions
+      from `closed`.
 
 ## Distant / someday
 
-- [ ] **Multi-account** — hold more than one Todoist account at once (today the
-      vault stores a single token; switching accounts needs Reset + re-enroll).
-      Would require a per-account vault and an account switcher in the UI.
+- [ ] **Multi-account** — hold more than one Todoist account at once. Today the
+      vault stores a single token; switching accounts needs Reset + re-enroll.
+      Needs a per-account vault and an account switcher.
