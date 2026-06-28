@@ -10,6 +10,16 @@
 
   const toData = (s: DailySeries): uPlot.AlignedData => [s.t, s.opened, s.closed]
 
+  // Daily points sit at UTC midnight, so format in UTC to avoid a local-tz
+  // shift (e.g. midnight UTC rendering as "1am"). Date-only, 3-letter month.
+  const fmtAxis = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
+  const fmtHover = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+
   function options(width: number): uPlot.Options {
     return {
       width,
@@ -17,12 +27,18 @@
       scales: { x: { time: true } },
       legend: { show: true },
       series: [
-        {},
+        // Hover readout shows the full date (no time — data is daily).
+        { value: (_u, v) => (v == null ? '' : fmtHover.format(v * 1000)) },
         { label: 'Opened', stroke: '#5ac8fa', width: 2, points: { show: false } },
         { label: 'Closed', stroke: '#79d18a', width: 2, points: { show: false } },
       ],
       axes: [
-        { stroke: '#9a8f84', grid: { stroke: '#2e2823' }, ticks: { stroke: '#2e2823' } },
+        {
+          stroke: '#9a8f84',
+          grid: { stroke: '#2e2823' },
+          ticks: { stroke: '#2e2823' },
+          values: (_u, splits) => splits.map((s) => fmtAxis.format(s * 1000)),
+        },
         { stroke: '#9a8f84', grid: { stroke: '#2e2823' }, ticks: { stroke: '#2e2823' } },
       ],
     }
