@@ -1,4 +1,4 @@
-# Todoist Stats
+# Hindsight
 
 A self-contained, static dashboard for your Todoist task statistics — opened,
 closed, postponed, rescheduled, scheduled, unscheduled, reprioritized, and mean

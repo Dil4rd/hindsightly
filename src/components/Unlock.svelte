@@ -59,7 +59,7 @@
 </script>
 
 <main class="unlock">
-  <h1>Todoist Stats</h1>
+  <h1>Hindsight</h1>
 
   {#if !supported}
     <p class="error">

@@ -1,9 +1,9 @@
 // WebAuthn ceremonies used purely as a PRF key-derivation oracle.
 // No server, no signature verification — security rests on the fact that the
 // correct PRF output can only be produced by the authenticator that holds the
-// credential secret. See memory: todoist-stats-auth-design.
+// credential secret.
 
-const RP_NAME = 'Todoist Stats'
+const RP_NAME = 'Hindsight'
 
 // --- base64url helpers ------------------------------------------------------
 

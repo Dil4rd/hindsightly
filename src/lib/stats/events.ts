@@ -1,5 +1,5 @@
 // Classify a single activity event into metric buckets.
-// Locked rules (see memory: todoist-stats-project):
+// Locked rules:
 //   - postponed/rescheduled are mutually exclusive, split by due-date move
 //     direction at DAY granularity
 //   - scheduled (none->date) and unscheduled (date->none) are their own buckets

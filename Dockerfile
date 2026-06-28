@@ -16,7 +16,7 @@ COPY --from=builder /app/dist/index.html /index.html
 
 # 3) Static server for local/prod. http://localhost:<port> is a WebAuthn
 #    secure context, so the served container is fully usable for dev/testing:
-#    docker build --target serve -t todoist-stats . && docker run -p 8080:80 todoist-stats
+#    docker build --target serve -t hindsight . && docker run -p 8080:80 hindsight
 FROM nginx:1.27-alpine AS serve
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html

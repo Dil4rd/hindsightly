@@ -29,7 +29,7 @@ export interface Vault {
   wrapped: WrappedToken[]
 }
 
-const HKDF_INFO = new TextEncoder().encode('todoist-stats/token-key/v1')
+const HKDF_INFO = new TextEncoder().encode('hindsight/token-key/v1')
 
 async function deriveAesKey(prfOutput: ArrayBuffer, salt: BufferSource): Promise<CryptoKey> {
   const baseKey = await crypto.subtle.importKey('raw', prfOutput, 'HKDF', false, ['deriveKey'])

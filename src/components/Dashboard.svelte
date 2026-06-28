@@ -92,7 +92,7 @@
 
 <div class="dashboard">
   <header>
-    <h1>Todoist Stats</h1>
+    <h1>Hindsight</h1>
     <div class="actions">
       <button class="ghost" onclick={() => loadActivity(preset)} disabled={loading}>
         {loading ? 'Loading…' : 'Refresh'}

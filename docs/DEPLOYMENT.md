@@ -49,8 +49,8 @@ npm ci && npm run build
 (passkey enrollment + unlock work):
 
 ```bash
-docker build --target serve -t todoist-stats .
-docker run --rm -p 8080:80 todoist-stats
+docker build --target serve -t hindsight .
+docker run --rm -p 8080:80 hindsight
 # open http://localhost:8080
 ```
 
@@ -66,10 +66,10 @@ Cloudflare.
 
 ```bash
 cloudflared tunnel login
-cloudflared tunnel create todoist-stats
+cloudflared tunnel create hindsight
 # Map a hostname to the local server:
-cloudflared tunnel route dns todoist-stats stats.example.com
-cloudflared tunnel run --url http://localhost:8080 todoist-stats
+cloudflared tunnel route dns hindsight stats.example.com
+cloudflared tunnel run --url http://localhost:8080 hindsight
 # enroll your passkey at https://stats.example.com  (stable forever)
 ```
 

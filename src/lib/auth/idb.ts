@@ -1,7 +1,7 @@
 // Minimal single-record IndexedDB wrapper for the encrypted vault.
 // One database, one store, one key — no dependency needed.
 
-const DB_NAME = 'todoist-stats'
+const DB_NAME = 'hindsight'
 const STORE = 'vault'
 const KEY = 'default'
 

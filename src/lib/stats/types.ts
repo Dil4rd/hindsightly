@@ -1,4 +1,4 @@
-// Locked metric definitions (see memory: todoist-stats-project).
+// Locked metric definitions.
 // postponed and rescheduled are MUTUALLY EXCLUSIVE, split by due-date move
 // direction at DAY granularity (in the task's due timezone).
 
