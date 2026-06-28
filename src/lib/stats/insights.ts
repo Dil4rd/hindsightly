@@ -1,0 +1,213 @@
+// The insight layer: interpret the raw signals into answers to the four retro
+// questions. Pure — computed from the same in-scope data as the metrics, so it
+// follows the time / project / priority filters.
+
+import type { ActivityEvent, CompletedItem, Project } from '../todoist/types'
+import { classify } from './events'
+import { completedInScope, eventInScope, type Filters } from './filters'
+
+export type InsightTone = 'good' | 'warn' | 'info'
+export type InsightCategory = 'right-tasks' | 'structure' | 'prioritization' | 'execution'
+
+export interface Insight {
+  category: InsightCategory
+  tone: InsightTone
+  title: string
+  detail: string
+}
+
+export const INSIGHT_CATEGORIES: InsightCategory[] = [
+  'right-tasks',
+  'structure',
+  'prioritization',
+  'execution',
+]
+
+export const INSIGHT_QUESTIONS: Record<InsightCategory, string> = {
+  'right-tasks': 'Are you tracking the right tasks?',
+  structure: 'Does your project structure make sense?',
+  prioritization: 'Are you prioritizing well?',
+  execution: 'Are you executing well?',
+}
+
+const DAY = 86_400_000
+const fmtDur = (ms: number) =>
+  ms >= 2 * DAY ? `${(ms / DAY).toFixed(1)}d` : `${Math.round(ms / 3_600_000)}h`
+const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0)
+
+export function computeInsights(
+  events: ActivityEvent[],
+  completed: CompletedItem[],
+  projects: Project[],
+  filters: Filters,
+): Insight[] {
+  const evs = events.filter((e) => eventInScope(e, filters))
+  const done = completed.filter((c) => completedInScope(c, filters))
+  const out: Insight[] = []
+
+  let opened = 0
+  let closed = 0
+  let postponed = 0
+  let reprioritized = 0
+  const postponesByItem = new Map<string, number>()
+  const activityByProject = new Map<string, number>()
+
+  for (const e of evs) {
+    const buckets = classify(e)
+    for (const b of buckets) {
+      if (b === 'opened') opened++
+      else if (b === 'closed') closed++
+      else if (b === 'postponed') postponed++
+      else if (b === 'reprioritized') reprioritized++
+    }
+    if (buckets.length && e.parent_project_id) {
+      activityByProject.set(
+        e.parent_project_id,
+        (activityByProject.get(e.parent_project_id) ?? 0) + 1,
+      )
+    }
+    if (buckets.includes('postponed')) {
+      postponesByItem.set(e.object_id, (postponesByItem.get(e.object_id) ?? 0) + 1)
+    }
+  }
+
+  // ---- Are you tracking the right tasks? ----
+  if (postponed > 0) {
+    const serial = [...postponesByItem.values()].filter((n) => n >= 3).length
+    out.push(
+      serial > 0
+        ? {
+            category: 'right-tasks',
+            tone: 'warn',
+            title: `${serial} task${serial > 1 ? 's' : ''} postponed 3+ times`,
+            detail:
+              'Repeatedly pushed tasks are often the wrong task, too big, or avoided — break them down or drop them.',
+          }
+        : {
+            category: 'right-tasks',
+            tone: 'good',
+            title: 'No chronic postponers',
+            detail: 'No task was pushed to a later day three or more times.',
+          },
+    )
+  }
+  if (opened || closed) {
+    const net = opened - closed
+    out.push({
+      category: 'right-tasks',
+      tone: net > 0 ? 'warn' : 'good',
+      title: net > 0 ? `Backlog grew by ${net}` : net < 0 ? `Backlog shrank by ${-net}` : 'Backlog held steady',
+      detail: `Opened ${opened}, closed ${closed} in this period.`,
+    })
+  }
+
+  // ---- Does your project structure make sense? ----
+  const liveProjects = projects.filter(
+    (p) => !p.is_deleted && !p.is_archived && !p.inbox_project,
+  )
+  if (liveProjects.length) {
+    const dead = liveProjects.filter((p) => !activityByProject.get(p.id)).length
+    if (dead > 0) {
+      out.push({
+        category: 'structure',
+        tone: 'info',
+        title: `${dead} project${dead > 1 ? 's' : ''} with no activity`,
+        detail: 'Inactive projects add noise — consider archiving them.',
+      })
+    }
+  }
+  const totalActivity = [...activityByProject.values()].reduce((a, b) => a + b, 0)
+  if (activityByProject.size > 1) {
+    let topId = ''
+    let topN = 0
+    for (const [id, n] of activityByProject) if (n > topN) [topN, topId] = [n, id]
+    const share = pct(topN, totalActivity)
+    if (share >= 50) {
+      const name = projects.find((p) => p.id === topId)?.name ?? 'one project'
+      out.push({
+        category: 'structure',
+        tone: 'info',
+        title: `${share}% of activity in “${name}”`,
+        detail: 'Most of your activity is concentrated in a single project.',
+      })
+    }
+  }
+  const inbox = projects.find((p) => p.inbox_project)
+  if (inbox && totalActivity > 0) {
+    const share = pct(activityByProject.get(inbox.id) ?? 0, totalActivity)
+    if (share >= 30) {
+      out.push({
+        category: 'structure',
+        tone: 'warn',
+        title: `${share}% of activity stayed in Inbox`,
+        detail: 'Tasks lingering in Inbox usually means they aren’t organized into projects.',
+      })
+    }
+  }
+
+  // ---- Are you prioritizing well? (Todoist priority 4 = P1 highest) ----
+  const mttc = new Map<number, { total: number; n: number }>()
+  for (const c of done) {
+    const a = Date.parse(c.added_at)
+    const d = Date.parse(c.completed_at)
+    if (Number.isFinite(a) && Number.isFinite(d) && d >= a) {
+      const g = mttc.get(c.priority) ?? { total: 0, n: 0 }
+      g.total += d - a
+      g.n++
+      mttc.set(c.priority, g)
+    }
+  }
+  const hi = mttc.get(4)
+  const lo = mttc.get(1)
+  if (hi?.n && lo?.n) {
+    const hiAvg = hi.total / hi.n
+    const loAvg = lo.total / lo.n
+    out.push(
+      hiAvg <= loAvg
+        ? {
+            category: 'prioritization',
+            tone: 'good',
+            title: `P1 finishes faster (${fmtDur(hiAvg)} vs P4 ${fmtDur(loAvg)})`,
+            detail: 'High-priority tasks complete sooner than low — priorities are guiding execution.',
+          }
+        : {
+            category: 'prioritization',
+            tone: 'warn',
+            title: `P1 is slower than P4 (${fmtDur(hiAvg)} vs ${fmtDur(loAvg)})`,
+            detail: 'High-priority tasks take longer than low — priorities may not reflect what you do.',
+          },
+    )
+  }
+  if (reprioritized > 0 && opened + closed > 0 && pct(reprioritized, opened + closed) >= 20) {
+    out.push({
+      category: 'prioritization',
+      tone: 'warn',
+      title: `${reprioritized} reprioritizations`,
+      detail: 'Frequent priority changes suggest priorities aren’t clear when tasks are created.',
+    })
+  }
+
+  // ---- Are you executing well? ----
+  if (opened > 0) {
+    const ratio = closed / opened
+    out.push({
+      category: 'execution',
+      tone: ratio >= 0.9 ? 'good' : 'warn',
+      title: `Closed ${Math.round(ratio * 100)}% of what you opened`,
+      detail:
+        ratio >= 1
+          ? 'You closed at least as many tasks as you opened — keeping pace.'
+          : 'You opened more than you closed — the gap becomes backlog.',
+    })
+  }
+  if (postponed > 0 && postponed + closed > 0 && pct(postponed, postponed + closed) >= 40) {
+    out.push({
+      category: 'execution',
+      tone: 'warn',
+      title: `${pct(postponed, postponed + closed)}% push-vs-do`,
+      detail: `You postponed ${postponed} task(s) vs closing ${closed} — a lot of pushing relative to doing.`,
+    })
+  }
+
+  return out
+}

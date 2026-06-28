@@ -6,14 +6,14 @@ Hindsight is a retrospective instrument for a Todoist-based GTD practice:
 "did it work out, and what should I adjust?" Items below earn their place by
 serving that goal; this list is curated, not a backlog dump.
 
-## Next — the insight layer
+## Next — deepen the insight layer
 
-Turn the raw metrics into answers to the four retro questions:
+The first version (the four questions) is shipped. Worthwhile additions:
 
-- [ ] Tracking the *right* tasks? — serial postponers, never-closed / stale tasks
-- [ ] Project structure sane? — dead projects, over-stuffed projects, depth vs. use
-- [ ] Prioritizing correctly? — completion rate & MTTC by priority, priority churn
-- [ ] Executing correctly? — opened-vs-closed balance, postponement rate, trends
+- [ ] Throughput trend direction (improving / declining) from the weekly buckets
+- [ ] Stale OPEN tasks — created long ago and still not closed (needs current
+      open tasks, not just activity)
+- [ ] Per-priority completion rate (not only MTTC)
 
 ## Later
 

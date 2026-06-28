@@ -5,6 +5,7 @@
   import { presetWindow, type Filters, type TimePreset } from '../lib/stats/filters'
   import { computeMetrics } from '../lib/stats/metrics'
   import { granularityFor, trendSeries } from '../lib/stats/series'
+  import { computeInsights } from '../lib/stats/insights'
   import { buildTree, descendantIds } from '../lib/stats/tree'
   import {
     accountKey,
@@ -17,6 +18,7 @@
   import StatCard from './StatCard.svelte'
   import ProjectTree from './ProjectTree.svelte'
   import TrendChart from './TrendChart.svelte'
+  import InsightList from './InsightList.svelte'
   import Logo from './Logo.svelte'
 
   let { token, cacheKey, onLock }: { token: string; cacheKey: CryptoKey; onLock: () => void } =
@@ -144,6 +146,7 @@
   const hasData = $derived(
     Object.values(metrics.counts).some((n) => n > 0) || metrics.meanTimeToCompleteMs != null,
   )
+  const insights = $derived(computeInsights(events, completed, projects, filters))
 
   const PRESETS: TimePreset[] = ['week', 'month', 'quarter', 'year']
   const PRIORITIES: { label: string; value: number | null }[] = [
@@ -255,6 +258,13 @@
           <p class="empty">No activity in this period.</p>
         {/if}
       </section>
+
+      {#if hasData}
+        <section class="insights-wrap">
+          <h2>Insights</h2>
+          <InsightList {insights} />
+        </section>
+      {/if}
     </main>
   </div>
 </div>
@@ -378,6 +388,9 @@
     min-height: 240px;
     margin: 0;
     color: var(--muted);
+  }
+  .insights-wrap {
+    margin-top: 1.5rem;
   }
   @media (max-width: 640px) {
     .layout {

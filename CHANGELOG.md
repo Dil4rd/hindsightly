@@ -8,6 +8,12 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ## [Unreleased]
 
+### Added
+
+- Insight layer — an interpretive read of the four retro questions (right tasks,
+  project structure, prioritization, execution) below the chart, computed from
+  the same filtered data and color-coded by tone.
+
 ### Fixed
 
 - Year view no longer errors out, and mean-time-to-complete now covers the full
