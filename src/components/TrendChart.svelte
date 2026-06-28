@@ -5,8 +5,17 @@
 
   let { series }: { series: TrendSeries } = $props()
 
+  const OPENED = '#5ac8fa'
+  const CLOSED = '#79d18a'
+
   let el: HTMLDivElement
   let chart: uPlot | undefined
+
+  // Custom-legend hover state (uPlot's own legend is disabled).
+  let hover = $state(false)
+  let hoverOpened = $state(0)
+  let hoverClosed = $state(0)
+  let hoverWhen = $state('')
 
   const toData = (s: TrendSeries): uPlot.AlignedData => [s.t, s.opened, s.closed]
 
@@ -21,8 +30,6 @@
     hour12: false,
   })
 
-  // Compact hover readout: weekday + date + UTC time (day view), or the week's
-  // start (week view). Shown only while hovering.
   const fmtHover = (ms: number) =>
     series.granularity === 'week'
       ? `Week of ${fmtDate.format(ms)}`
@@ -30,8 +37,7 @@
 
   const DAY_SEC = 86_400
 
-  // Shade Sat/Sun behind the series (day view only) so weekend dips read as
-  // seasonality, not a real drop.
+  // Shade Sat/Sun behind the series (day view only).
   function weekendPlugin(): uPlot.Plugin {
     return {
       hooks: {
@@ -59,11 +65,16 @@
     }
   }
 
-  // Keep the color key visible always; reveal the live values + date only while
-  // hovering (CSS toggles on this class).
-  function toggleLegend(u: uPlot) {
-    const leg = u.root.querySelector('.u-legend') as HTMLElement | null
-    if (leg) leg.classList.toggle('u-hovering', u.cursor.idx != null)
+  function onCursor(u: uPlot) {
+    const idx = u.cursor.idx
+    if (idx == null) {
+      hover = false
+      return
+    }
+    hover = true
+    hoverOpened = (u.data[1][idx] as number) ?? 0
+    hoverClosed = (u.data[2][idx] as number) ?? 0
+    hoverWhen = fmtHover((u.data[0][idx] as number) * 1000)
   }
 
   function options(width: number): uPlot.Options {
@@ -71,13 +82,14 @@
       width,
       height: 240,
       scales: { x: { time: true } },
-      legend: { show: true },
+      legend: { show: false },
       plugins: [weekendPlugin()],
-      hooks: { setCursor: [toggleLegend], ready: [toggleLegend] },
+      hooks: { setCursor: [onCursor] },
+      cursor: { points: { show: true } },
       series: [
-        { label: '', value: (_u, v) => (v == null ? '' : fmtHover(v * 1000)) },
-        { label: 'Opened', stroke: '#5ac8fa', width: 2, points: { show: false } },
-        { label: 'Closed', stroke: '#79d18a', width: 2, points: { show: false } },
+        {},
+        { stroke: OPENED, width: 2, points: { show: false } },
+        { stroke: CLOSED, width: 2, points: { show: false } },
       ],
       axes: [
         {
@@ -114,19 +126,38 @@
 
 <div bind:this={el} class="chart"></div>
 
+<div class="legend">
+  <span class="key"><i class="sw" style:background={OPENED}></i>Opened{#if hover}: {hoverOpened}{/if}</span>
+  <span class="key"><i class="sw" style:background={CLOSED}></i>Closed{#if hover}: {hoverClosed}{/if}</span>
+  {#if hover}<span class="when">{hoverWhen}</span>{/if}
+</div>
+
 <style>
   .chart {
     width: 100%;
   }
-  /* Center the legend; always show the color key (markers + labels), but hide
-     the live values (numbers) and the x/date cell until hovering. */
-  :global(.u-legend) {
-    margin: 0.4rem auto 0;
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+    min-height: 1.3em;
   }
-  :global(.u-legend .u-value) {
-    visibility: hidden;
+  .key {
+    display: inline-flex;
+    align-items: center;
   }
-  :global(.u-legend.u-hovering .u-value) {
-    visibility: visible;
+  .sw {
+    width: 0.7em;
+    height: 0.7em;
+    border-radius: 2px;
+    margin-right: 0.4em;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+  .when {
+    color: var(--muted);
   }
 </style>
