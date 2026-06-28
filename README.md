@@ -48,5 +48,5 @@ Vitest. Native WebAuthn + WebCrypto (no auth dependency).
 - [x] Todoist data layer (`src/lib/todoist/`): projects, completed items, activity log (cursor-paginated)
 - [x] Stats engine (`src/lib/stats/`): event classification, metrics, filters (time · project tree · priority) — validated live (aggregates only)
 - [x] Dashboard UI (`Dashboard.svelte`): filter controls (time · project tree · priority), stat cards, uPlot opened-vs-closed trend
-- [ ] Release workflow: build single HTML + attach to GitHub Release (tags only)
+- [x] Release-on-tag workflow (`.github/workflows/release.yml`): builds single HTML via Docker, attaches to a GitHub Release on `v*` tags
 - [ ] Recurring-task handling (deferred; currently inflates `postponed`)
