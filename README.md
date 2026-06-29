@@ -27,26 +27,28 @@ directly browser → Todoist and processed locally.
 
 ## Develop
 
+Docker is the primary workflow (no local Node needed):
+
 ```bash
-npm install
-npm run dev      # http://localhost:5173
-npm run check    # svelte-check + node-side tsconfig typecheck
-npm test         # vitest
-npm run build    # → dist/index.html (single self-contained file)
+docker compose up dev          # Vite live-reload dev server → http://localhost:5173
+docker build --target artifact -o dist .                 # → ./dist/index.html (single file)
+docker build --target serve -t hindsightly . \
+  && docker run --rm -p 8080:80 hindsightly              # preview the built file → :8080
+
+docker compose run --rm dev npm test       # vitest
+docker compose run --rm dev npm run check   # svelte-check + node tsconfig
 ```
+
+`http://localhost` is a WebAuthn secure context, so the dev server and the
+preview both support passkey enrollment/unlock.
+
+Prefer local Node instead? `npm install` then `npm run dev | build | test | check`.
 
 ## Stack
 
 Svelte 5 · Vite + vite-plugin-singlefile · TypeScript · uPlot · date-fns ·
 Vitest. Native WebAuthn + WebCrypto (no auth dependency).
 
-## Status
+## Status & roadmap
 
-- [x] Security core: passkey PRF vault (`src/lib/auth/`), unlock UI
-- [x] Single-file build + CSP pipeline
-- [x] Docker build (`Dockerfile`) + deployment guide (`docs/DEPLOYMENT.md`)
-- [x] Todoist data layer (`src/lib/todoist/`): projects, completed items, activity log (cursor-paginated)
-- [x] Stats engine (`src/lib/stats/`): event classification, metrics, filters (time · project tree · priority) — validated live (aggregates only)
-- [x] Dashboard UI (`Dashboard.svelte`): filter controls (time · project tree · priority), stat cards, uPlot opened-vs-closed trend
-- [x] Release-on-tag workflow (`.github/workflows/release.yml`): builds single HTML via Docker, attaches to a GitHub Release on `v*` tags
-- [ ] Recurring-task handling (deferred; currently inflates `postponed`)
+Shipped work: [CHANGELOG.md](./CHANGELOG.md). Planned: [ROADMAP.md](./ROADMAP.md).
