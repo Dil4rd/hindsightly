@@ -23,6 +23,13 @@ one file over **HTTPS** (or `http://localhost`). The only real decision is the
 > The page being "public" is fine: it contains **no secrets**. The token lives
 > only in *your* browser (encrypted), and nothing works without *your* passkey.
 
+## Primary host: Vercel (push to main)
+
+The public deployment is **Vercel** at `https://hindsight.vercel.app` — a stable
+origin (good for passkeys), automatic HTTPS, no server. Setup: connect the repo
+in the Vercel dashboard; `vercel.json` tells it to run `npm run build` and serve
+`dist/`. Every push to `main` deploys automatically — no GitHub Action needed.
+
 ---
 
 ## Build

@@ -13,6 +13,13 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 - Insight layer — an interpretive read of the four retro questions (right tasks,
   project structure, prioritization, execution) below the chart, computed from
   the same filtered data and color-coded by tone.
+- Vercel deploy config (`vercel.json`) — `npm run build` → `dist/`, deployed on
+  push to `main` via Vercel's Git integration.
+
+### Changed
+
+- Hosting: use Vercel (push-to-main) as the primary host; removed the GitHub
+  Pages workflow. The release-on-tag workflow (single-file artifact) stays.
 
 ### Fixed
 
