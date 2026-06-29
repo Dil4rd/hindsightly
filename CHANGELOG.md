@@ -8,10 +8,22 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ## [Unreleased]
 
+### Added
+
+- Deeper insights — stale open tasks, throughput trend (improving/declining),
+  and per-priority completion rate.
+
 ### Changed
 
 - Trend chart is now a grouped bar histogram (opened vs. closed per day/week)
   with y-axis headroom so the tallest bar isn't clipped.
+- Docker is the primary dev workflow (`compose.yaml`: `docker compose up dev`).
+
+### Fixed
+
+- Weekend shading now aligns with each day's bars (was offset half a day, which
+  also mislabeled the hovered day).
+- Removed chart drag-to-zoom (unclear as navigation).
 
 ## [0.1.0] - 2026-06-29
 

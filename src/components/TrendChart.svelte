@@ -60,8 +60,10 @@
           for (const sec of xs) {
             const dow = new Date(sec * 1000).getUTCDay()
             if (dow !== 0 && dow !== 6) continue
-            const x0 = u.valToPos(sec, 'x', true)
-            const x1 = u.valToPos(sec + DAY_SEC, 'x', true)
+            // Center the band on the tick (bars straddle the tick), so it aligns
+            // with the weekend bars rather than shifting into the next day.
+            const x0 = u.valToPos(sec - DAY_SEC / 2, 'x', true)
+            const x1 = u.valToPos(sec + DAY_SEC / 2, 'x', true)
             ctx.fillRect(x0, top, x1 - x0, height)
           }
           ctx.restore()
@@ -94,8 +96,9 @@
       legend: { show: false },
       plugins: [weekendPlugin()],
       hooks: { setCursor: [onCursor] },
-      // Bars are the markers; the legend shows values on hover.
-      cursor: { points: { show: false } },
+      // Bars are the markers; the legend shows values on hover. Disable
+      // drag-to-zoom (not obvious as navigation).
+      cursor: { points: { show: false }, drag: { x: false, y: false } },
       series: [
         {},
         // Grouped bars: opened to the right of each tick, closed to the left.
