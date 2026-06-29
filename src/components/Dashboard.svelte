@@ -5,7 +5,7 @@
   import { presetWindow, type Filters, type TimePreset } from '../lib/stats/filters'
   import { computeMetrics } from '../lib/stats/metrics'
   import { granularityFor, trendSeries } from '../lib/stats/series'
-  import { computeInsights } from '../lib/stats/insights'
+  import { computeInsights, type Insight } from '../lib/stats/insights'
   import { buildTree, descendantIds } from '../lib/stats/tree'
   import {
     accountKey,
@@ -20,6 +20,7 @@
   import ProjectTree from './ProjectTree.svelte'
   import TrendChart from './TrendChart.svelte'
   import InsightList from './InsightList.svelte'
+  import InsightDrawer from './InsightDrawer.svelte'
   import Logo from './Logo.svelte'
   import ThemeToggle from './ThemeToggle.svelte'
 
@@ -44,6 +45,7 @@
   let preset = $state<TimePreset>('week')
   let priority = $state<number | null>(null)
   let selectedProjectId = $state<string | null>(null)
+  let selectedInsight = $state<Insight | null>(null)
 
   // data
   let projects = $state<Project[]>([])
@@ -75,12 +77,14 @@
   async function persist() {
     if (fetchedSince == null || !account) return
     try {
+      // Strip task text only at rest; full content stays in memory for the
+      // insight drawer this session.
       await saveCache(account, cacheKey, {
         fetchedSince,
-        events,
-        completed,
+        events: events.map(stripEvent),
+        completed: completed.map(stripCompleted),
         projects,
-        openTasks,
+        openTasks: openTasks.map(stripOpenTask),
         isPremium,
         savedAt: Date.now(),
       })
@@ -118,7 +122,7 @@
           client.isPremium(),
         ])
         projects = pj
-        openTasks = ot.map(stripOpenTask)
+        openTasks = ot
         isPremium = premium
       }
 
@@ -131,8 +135,8 @@
           client.listActivities(new Date(evFrom)),
           client.listCompleted(new Date(cpFrom), now),
         ])
-        events = mergeById(events, ev.map(stripEvent))
-        completed = mergeById(completed, cp.map(stripCompleted))
+        events = mergeById(events, ev) // keep full content in memory
+        completed = mergeById(completed, cp)
       }
 
       // 4) Extend the range when the window reaches earlier than fetched.
@@ -144,8 +148,8 @@
           client.listActivities(since),
           client.listCompleted(since, until),
         ])
-        events = mergeById(events, ev.map(stripEvent))
-        completed = mergeById(completed, cp.map(stripCompleted))
+        events = mergeById(events, ev) // keep full content in memory
+        completed = mergeById(completed, cp)
         fetchedSince = sinceMs
       }
 
@@ -304,11 +308,13 @@
       {#if hasData}
         <section class="insights-wrap">
           <h2>Insights</h2>
-          <InsightList {insights} />
+          <InsightList {insights} onSelect={(i) => (selectedInsight = i)} />
         </section>
       {/if}
     </main>
   </div>
+
+  <InsightDrawer insight={selectedInsight} onClose={() => (selectedInsight = null)} />
 </div>
 
 <style>

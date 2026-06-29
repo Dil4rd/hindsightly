@@ -9,12 +9,23 @@ import { completedInScope, eventInScope, type Filters } from './filters'
 export type InsightTone = 'good' | 'warn' | 'info'
 export type InsightCategory = 'right-tasks' | 'structure' | 'prioritization' | 'execution'
 
+export interface InsightItem {
+  id: string
+  label?: string // task/project name when known (in-memory only; absent after reload)
+  meta?: string // e.g. "4×" or "37d"
+  href: string // deep link into Todoist
+}
+
 export interface Insight {
   category: InsightCategory
   tone: InsightTone
   title: string
   detail: string
+  items?: InsightItem[] // offenders, for the actionable drill-down drawer
 }
+
+const taskHref = (id: string) => `https://app.todoist.com/app/task/${id}`
+const projectHref = (id: string) => `https://app.todoist.com/app/project/${id}`
 
 export const INSIGHT_CATEGORIES: InsightCategory[] = [
   'right-tasks',
@@ -52,6 +63,7 @@ export function computeInsights(
   let reprioritized = 0
   const postponesByItem = new Map<string, number>()
   const activityByProject = new Map<string, number>()
+  const contentByItem = new Map<string, string>() // task title when present in events
 
   for (const e of evs) {
     const buckets = classify(e)
@@ -70,19 +82,26 @@ export function computeInsights(
     if (buckets.includes('postponed')) {
       postponesByItem.set(e.object_id, (postponesByItem.get(e.object_id) ?? 0) + 1)
     }
+    if (e.extra_data?.content) contentByItem.set(e.object_id, e.extra_data.content)
   }
 
   // ---- Are you tracking the right tasks? ----
   if (postponed > 0) {
-    const serial = [...postponesByItem.values()].filter((n) => n >= 3).length
+    const serial = [...postponesByItem.entries()].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1])
     out.push(
-      serial > 0
+      serial.length > 0
         ? {
             category: 'right-tasks',
             tone: 'warn',
-            title: `${serial} task${serial > 1 ? 's' : ''} postponed 3+ times`,
+            title: `${serial.length} task${serial.length > 1 ? 's' : ''} postponed 3+ times`,
             detail:
               'Repeatedly pushed tasks are often the wrong task, too big, or avoided — break them down or drop them.',
+            items: serial.map(([id, n]) => ({
+              id,
+              label: contentByItem.get(id),
+              meta: `${n}×`,
+              href: taskHref(id),
+            })),
           }
         : {
             category: 'right-tasks',
@@ -107,13 +126,14 @@ export function computeInsights(
     (p) => !p.is_deleted && !p.is_archived && !p.inbox_project,
   )
   if (liveProjects.length) {
-    const dead = liveProjects.filter((p) => !activityByProject.get(p.id)).length
-    if (dead > 0) {
+    const dead = liveProjects.filter((p) => !activityByProject.get(p.id))
+    if (dead.length > 0) {
       out.push({
         category: 'structure',
         tone: 'info',
-        title: `${dead} project${dead > 1 ? 's' : ''} with no activity`,
+        title: `${dead.length} project${dead.length > 1 ? 's' : ''} with no activity`,
         detail: 'Inactive projects add noise — consider archiving them.',
+        items: dead.map((p) => ({ id: p.id, label: p.name, href: projectHref(p.id) })),
       })
     }
   }
@@ -221,12 +241,19 @@ export function computeInsights(
   if (scopedOpen.length) {
     const stale = scopedOpen.filter((t) => nowMs - Date.parse(t.added_at) > STALE_MS)
     if (stale.length) {
-      const oldest = Math.max(...stale.map((t) => nowMs - Date.parse(t.added_at)))
+      const byAge = [...stale].sort((a, b) => Date.parse(a.added_at) - Date.parse(b.added_at))
+      const oldest = nowMs - Date.parse(byAge[0].added_at)
       out.push({
         category: 'right-tasks',
         tone: 'warn',
         title: `${stale.length} open task${stale.length > 1 ? 's' : ''} older than 30 days`,
         detail: `Long-open tasks may be stuck, stale, or need breaking down (oldest: ${Math.round(oldest / DAY)} days).`,
+        items: byAge.map((t) => ({
+          id: t.id,
+          label: t.content || undefined,
+          meta: `${Math.round((nowMs - Date.parse(t.added_at)) / DAY)}d`,
+          href: taskHref(t.id),
+        })),
       })
     } else {
       out.push({

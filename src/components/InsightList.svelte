@@ -6,7 +6,7 @@
     type InsightCategory,
   } from '../lib/stats/insights'
 
-  let { insights }: { insights: Insight[] } = $props()
+  let { insights, onSelect }: { insights: Insight[]; onSelect: (i: Insight) => void } = $props()
 
   const byCat = $derived(
     Object.fromEntries(
@@ -23,11 +23,24 @@
         <ul>
           {#each byCat[c] as ins, i (i)}
             <li class={ins.tone}>
-              <span class="dot" aria-hidden="true"></span>
-              <div class="text">
-                <strong>{ins.title}</strong>
-                <span class="detail">{ins.detail}</span>
-              </div>
+              {#if ins.items?.length}
+                <button type="button" class="row clickable" onclick={() => onSelect(ins)}>
+                  <span class="dot" aria-hidden="true"></span>
+                  <span class="text">
+                    <strong>{ins.title}</strong>
+                    <span class="detail">{ins.detail}</span>
+                  </span>
+                  <span class="count">{ins.items.length} ›</span>
+                </button>
+              {:else}
+                <div class="row">
+                  <span class="dot" aria-hidden="true"></span>
+                  <span class="text">
+                    <strong>{ins.title}</strong>
+                    <span class="detail">{ins.detail}</span>
+                  </span>
+                </div>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -63,10 +76,26 @@
     flex-direction: column;
     gap: 0.7rem;
   }
-  li {
+  .row {
     display: flex;
     gap: 0.6rem;
     align-items: start;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+  }
+  button.clickable {
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 0.3rem;
+    margin: -0.3rem;
+  }
+  button.clickable:hover {
+    background: var(--bg);
   }
   .dot {
     flex: 0 0 auto;
@@ -89,6 +118,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   strong {
     font-size: 0.9rem;
@@ -98,6 +129,12 @@
     font-size: 0.78rem;
     color: var(--muted);
     line-height: 1.35;
+  }
+  .count {
+    flex: 0 0 auto;
+    align-self: center;
+    font-size: 0.8rem;
+    color: var(--muted);
   }
   .none {
     margin: 0;

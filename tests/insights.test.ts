@@ -85,4 +85,12 @@ describe('computeInsights', () => {
   it('flags stale open tasks older than 30 days', () => {
     expect(has(titles, /open task.*older than 30 days/)).toBe(true)
   })
+  it('dead-projects insight lists the offending projects', () => {
+    const ins = insights.find((i) => /project.*no activity/.test(i.title))
+    expect(ins?.items?.some((it) => it.id === 'P2' && it.href.includes('/project/P2'))).toBe(true)
+  })
+  it('serial-postponer insight lists the offending tasks', () => {
+    const ins = insights.find((i) => /postponed 3\+/.test(i.title))
+    expect(ins?.items?.some((it) => it.id === 'A' && it.href.includes('/task/A'))).toBe(true)
+  })
 })

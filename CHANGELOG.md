@@ -16,6 +16,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
   follows the theme.
 - Plan awareness — month/quarter/year are disabled on free Todoist accounts
   (their activity log keeps only ~7 days); detected via `is_premium`.
+- Actionable insights — clicking an insight opens a drawer listing the specific
+  offenders (dead projects, serial postponers, stale tasks) with deep links into
+  Todoist. Task titles are kept in memory only; the cache stores ids, not text.
 
 ### Changed
 
