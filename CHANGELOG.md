@@ -8,6 +8,11 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ## [Unreleased]
 
+### Changed
+
+- Trend chart is now a grouped bar histogram (opened vs. closed per day/week)
+  with y-axis headroom so the tallest bar isn't clipped.
+
 ## [0.1.0] - 2026-06-29
 
 Initial release.

@@ -86,23 +86,21 @@
     return {
       width,
       height: 240,
-      scales: { x: { time: true } },
+      // Headroom so the tallest bar isn't at the top edge and the top tick is labeled.
+      scales: {
+        x: { time: true },
+        y: { range: (_u, _min, max) => [0, Math.max(1, Math.ceil(max * 1.15))] },
+      },
       legend: { show: false },
       plugins: [weekendPlugin()],
       hooks: { setCursor: [onCursor] },
-      // Keep uPlot's default point-creating `show`; only customize appearance,
-      // so the hovered point is marked with a solid dot per series.
-      cursor: {
-        points: {
-          size: (_u, i) => (i === 0 ? 0 : 8),
-          width: 0,
-          fill: (_u, i) => (i === 1 ? OPENED : CLOSED),
-        },
-      },
+      // Bars are the markers; the legend shows values on hover.
+      cursor: { points: { show: false } },
       series: [
         {},
-        { stroke: OPENED, width: 2, points: { show: false } },
-        { stroke: CLOSED, width: 2, points: { show: false } },
+        // Grouped bars: opened to the right of each tick, closed to the left.
+        { stroke: OPENED, fill: OPENED, points: { show: false }, paths: uPlot.paths.bars!({ align: 1, size: [0.45] }) },
+        { stroke: CLOSED, fill: CLOSED, points: { show: false }, paths: uPlot.paths.bars!({ align: -1, size: [0.45] }) },
       ],
       axes: [
         {
