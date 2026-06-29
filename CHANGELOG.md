@@ -10,8 +10,8 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ### Added
 
-- Deeper insights — stale open tasks, throughput trend (improving/declining),
-  and per-priority completion rate.
+- Deeper insights — stale open tasks, projects accumulating many stale tasks,
+  throughput trend (improving/declining), and per-priority completion rate.
 - Light theme with a toggle (persists; defaults to the OS preference). The chart
   follows the theme.
 - Plan awareness — month/quarter/year are disabled on free Todoist accounts
