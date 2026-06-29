@@ -2,7 +2,7 @@
 
 Forward-looking only — shipped work lives in [CHANGELOG.md](./CHANGELOG.md).
 
-Hindsight is a retrospective instrument for a Todoist-based GTD practice:
+Hindsightly is a retrospective instrument for a Todoist-based GTD practice:
 "did it work out, and what should I adjust?" Items below earn their place by
 serving that goal; this list is curated, not a backlog dump.
 

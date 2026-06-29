@@ -3,7 +3,7 @@
 // correct PRF output can only be produced by the authenticator that holds the
 // credential secret.
 
-const RP_NAME = 'Hindsight'
+const RP_NAME = 'Hindsightly'
 
 // --- base64url helpers ------------------------------------------------------
 
@@ -60,7 +60,7 @@ function toArrayBuffer(v: unknown): ArrayBuffer | null {
 // secret differs), so one shared salt suffices and lets us use the most widely
 // supported request shape: top-level `eval` (1Password doesn't honor
 // `evalByCredential`).
-const PRF_SALT = new TextEncoder().encode('hindsight:prf:v1')
+const PRF_SALT = new TextEncoder().encode('hindsightly:prf:v1')
 
 const prfExtension = () =>
   ({ prf: { eval: { first: PRF_SALT } } }) as AuthenticationExtensionsClientInputs

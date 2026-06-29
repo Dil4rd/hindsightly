@@ -166,7 +166,7 @@
 
 <div class="dashboard">
   <header>
-    <h1><span class="logo"><Logo size={22} /></span> Hindsight</h1>
+    <h1><span class="logo"><Logo size={22} /></span> Hindsightly</h1>
     <div class="actions">
       <button class="ghost" onclick={refresh} disabled={loading}>
         {loading ? 'Loading…' : 'Refresh'}

@@ -33,11 +33,11 @@ export interface Unlocked {
   cacheKey: CryptoKey
 }
 
-const TOKEN_INFO = new TextEncoder().encode('hindsight/token-key/v1')
-const CACHE_INFO = new TextEncoder().encode('hindsight/cache-key/v1')
+const TOKEN_INFO = new TextEncoder().encode('hindsightly/token-key/v1')
+const CACHE_INFO = new TextEncoder().encode('hindsightly/cache-key/v1')
 // Fixed, non-secret HKDF salt (PRF output is already high-entropy; HKDF's role
 // here is domain separation via `info`).
-const HKDF_SALT = new TextEncoder().encode('hindsight:hkdf:v1')
+const HKDF_SALT = new TextEncoder().encode('hindsightly:hkdf:v1')
 
 async function deriveAesKey(prfOutput: ArrayBuffer, info: BufferSource): Promise<CryptoKey> {
   const baseKey = await crypto.subtle.importKey('raw', prfOutput, 'HKDF', false, ['deriveKey'])

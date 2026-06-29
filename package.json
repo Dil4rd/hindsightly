@@ -1,10 +1,10 @@
 {
-  "name": "hindsight",
+  "name": "hindsightly",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Self-contained static dashboard for Todoist task statistics, secured with passkey (WebAuthn PRF) encryption.",
-  "repository": { "type": "git", "url": "https://github.com/Dil4rd/hindsight.git" },
+  "repository": { "type": "git", "url": "https://github.com/Dil4rd/hindsightly.git" },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

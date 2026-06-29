@@ -25,7 +25,7 @@ one file over **HTTPS** (or `http://localhost`). The only real decision is the
 
 ## Primary host: Vercel (push to main)
 
-The public deployment is **Vercel** at `https://hindsight.vercel.app` — a stable
+The public deployment is **Vercel** at `https://hindsightly.vercel.app` — a stable
 origin (good for passkeys), automatic HTTPS, no server. Setup: connect the repo
 in the Vercel dashboard; `vercel.json` tells it to run `npm run build` and serve
 `dist/`. Every push to `main` deploys automatically — no GitHub Action needed.
@@ -56,8 +56,8 @@ npm ci && npm run build
 (passkey enrollment + unlock work):
 
 ```bash
-docker build --target serve -t hindsight .
-docker run --rm -p 8080:80 hindsight
+docker build --target serve -t hindsightly .
+docker run --rm -p 8080:80 hindsightly
 # open http://localhost:8080
 ```
 
@@ -73,10 +73,10 @@ Cloudflare.
 
 ```bash
 cloudflared tunnel login
-cloudflared tunnel create hindsight
+cloudflared tunnel create hindsightly
 # Map a hostname to the local server:
-cloudflared tunnel route dns hindsight stats.example.com
-cloudflared tunnel run --url http://localhost:8080 hindsight
+cloudflared tunnel route dns hindsightly stats.example.com
+cloudflared tunnel run --url http://localhost:8080 hindsightly
 # enroll your passkey at https://stats.example.com  (stable forever)
 ```
 

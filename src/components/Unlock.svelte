@@ -71,7 +71,7 @@
 </script>
 
 <main class="unlock">
-  <h1><span class="logo"><Logo size={26} /></span> Hindsight</h1>
+  <h1><span class="logo"><Logo size={26} /></span> Hindsightly</h1>
 
   {#if !supported}
     <p class="error">

@@ -2,7 +2,7 @@
 //   - 'vault' : the passkey-encrypted token
 //   - 'cache' : the persisted (content-stripped) Todoist dataset
 
-const DB_NAME = 'hindsight'
+const DB_NAME = 'hindsightly'
 const DB_VERSION = 2
 const STORES = ['vault', 'cache'] as const
 type Store = (typeof STORES)[number]
