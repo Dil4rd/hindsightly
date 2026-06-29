@@ -14,10 +14,11 @@ function ev(
   object_id: string,
   extra_data: ActivityExtraData = {},
   project = 'P1',
+  date = '2026-06-10T10:00:00Z',
 ): ActivityEvent {
   return {
     id: Math.random(),
-    event_date: '2026-06-10T10:00:00Z',
+    event_date: date,
     event_type,
     object_type: 'item',
     object_id,
@@ -52,7 +53,10 @@ describe('computeInsights', () => {
   const events: ActivityEvent[] = [
     ...['o1', 'o2', 'o3', 'o4', 'o5'].map((id) => ev('added', id)),
     ...['c1', 'c2'].map((id) => ev('completed', id)),
-    ...[0, 1, 2].map(() => ev('updated', 'A', { last_due_date: '2026-06-01', due_date: '2026-06-10' })),
+    // 3 postpones of task A, days apart (not debounced)
+    ev('updated', 'A', { last_due_date: '2026-06-01', due_date: '2026-06-10' }, 'P1', '2026-06-08T10:00:00Z'),
+    ev('updated', 'A', { last_due_date: '2026-06-01', due_date: '2026-06-11' }, 'P1', '2026-06-09T10:00:00Z'),
+    ev('updated', 'A', { last_due_date: '2026-06-01', due_date: '2026-06-12' }, 'P1', '2026-06-10T10:00:00Z'),
   ]
   const completed = [
     done('2026-06-09T00:00:00Z', '2026-06-10T00:00:00Z', 4), // P1, 1 day
@@ -92,6 +96,16 @@ describe('computeInsights', () => {
   it('serial-postponer insight lists the offending tasks', () => {
     const ins = insights.find((i) => /postponed 3\+/.test(i.title))
     expect(ins?.items?.some((it) => it.id === 'A' && it.href.includes('/task/A'))).toBe(true)
+  })
+
+  it('debounces rapid reschedules of the same task (within 10 min)', () => {
+    const burst = [
+      ev('updated', 'B', { last_due_date: '2026-06-01', due_date: '2026-06-10' }, 'P1', '2026-06-10T10:00:00Z'),
+      ev('updated', 'B', { last_due_date: '2026-06-01', due_date: '2026-06-11' }, 'P1', '2026-06-10T10:03:00Z'),
+      ev('updated', 'B', { last_due_date: '2026-06-01', due_date: '2026-06-12' }, 'P1', '2026-06-10T10:06:00Z'),
+    ]
+    const res = computeInsights(burst, [], [proj('P1')], [], filters) // default 10-min dedup
+    expect(res.some((i) => /postponed 3\+/.test(i.title))).toBe(false)
   })
 
   it('flags projects accumulating many stale tasks', () => {

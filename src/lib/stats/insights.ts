@@ -3,8 +3,9 @@
 // follows the time / project / priority filters.
 
 import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../todoist/types'
-import { classify } from './events'
+import { classify, countedBuckets, suppressedDueChanges } from './events'
 import { completedInScope, eventInScope, type Filters } from './filters'
+import { RESCHEDULE_DEDUP_MS } from '../config'
 
 export type InsightTone = 'good' | 'warn' | 'info'
 export type InsightCategory = 'right-tasks' | 'structure' | 'prioritization' | 'execution'
@@ -52,9 +53,11 @@ export function computeInsights(
   projects: Project[],
   openTasks: OpenTask[],
   filters: Filters,
+  dedupMs: number = RESCHEDULE_DEDUP_MS,
 ): Insight[] {
   const evs = events.filter((e) => eventInScope(e, filters))
   const done = completed.filter((c) => completedInScope(c, filters))
+  const suppress = suppressedDueChanges(evs, dedupMs)
   const out: Insight[] = []
 
   let opened = 0
@@ -66,7 +69,7 @@ export function computeInsights(
   const contentByItem = new Map<string, string>() // task title when present in events
 
   for (const e of evs) {
-    const buckets = classify(e)
+    const buckets = countedBuckets(e, suppress)
     for (const b of buckets) {
       if (b === 'opened') opened++
       else if (b === 'closed') closed++

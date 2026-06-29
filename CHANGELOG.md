@@ -19,6 +19,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 - Actionable insights — clicking an insight opens a drawer listing the specific
   offenders (dead projects, serial postponers, stale tasks) with deep links into
   Todoist. Task titles are kept in memory only; the cache stores ids, not text.
+- Reschedule debounce — multiple due-date changes on the same task within a
+  window count as one (typo-correction noise); window via
+  `VITE_RESCHEDULE_DEDUP_MIN` (default 10 min).
 
 ### Changed
 

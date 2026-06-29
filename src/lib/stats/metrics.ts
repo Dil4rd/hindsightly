@@ -1,9 +1,10 @@
 // Aggregate filtered activity events + completed items into the final metrics.
 
 import type { ActivityEvent, CompletedItem } from '../todoist/types'
-import { classify, isRecurringCompletion } from './events'
+import { countedBuckets, isRecurringCompletion, suppressedDueChanges } from './events'
 import { completedInScope, eventInScope, type Filters } from './filters'
 import { METRIC_BUCKETS, type MetricBucket, type Metrics } from './types'
+import { RESCHEDULE_DEDUP_MS } from '../config'
 
 export function emptyCounts(): Record<MetricBucket, number> {
   return Object.fromEntries(METRIC_BUCKETS.map((b) => [b, 0])) as Record<MetricBucket, number>
@@ -13,12 +14,14 @@ export function computeMetrics(
   events: ActivityEvent[],
   completed: CompletedItem[],
   filters: Filters,
+  dedupMs: number = RESCHEDULE_DEDUP_MS,
 ): Metrics {
   const counts = emptyCounts()
   let recurringClosed = 0
-  for (const ev of events) {
-    if (!eventInScope(ev, filters)) continue
-    for (const bucket of classify(ev)) counts[bucket]++
+  const inScope = events.filter((e) => eventInScope(e, filters))
+  const suppress = suppressedDueChanges(inScope, dedupMs)
+  for (const ev of inScope) {
+    for (const bucket of countedBuckets(ev, suppress)) counts[bucket]++
     if (isRecurringCompletion(ev)) recurringClosed++
   }
 
