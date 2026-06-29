@@ -85,6 +85,13 @@ export function computeInsights(
     if (e.extra_data?.content) contentByItem.set(e.object_id, e.extra_data.content)
   }
 
+  // Best-known task title by id: event content, then completed items, then the
+  // current open-tasks snapshot (freshest — wins). In-memory only; empty after
+  // a reload until data refetches.
+  const nameById = new Map<string, string>(contentByItem)
+  for (const c of completed) if (c.content) nameById.set(c.id, c.content)
+  for (const t of openTasks) if (t.content) nameById.set(t.id, t.content)
+
   // ---- Are you tracking the right tasks? ----
   if (postponed > 0) {
     const serial = [...postponesByItem.entries()].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1])
@@ -98,7 +105,7 @@ export function computeInsights(
               'Repeatedly pushed tasks are often the wrong task, too big, or avoided — break them down or drop them.',
             items: serial.map(([id, n]) => ({
               id,
-              label: contentByItem.get(id),
+              label: nameById.get(id),
               meta: `${n}×`,
               href: taskHref(id),
             })),
