@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { TodoistClient } from '../lib/todoist/client'
-  import type { ActivityEvent, CompletedItem, Project } from '../lib/todoist/types'
+  import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../lib/todoist/types'
   import { presetWindow, type Filters, type TimePreset } from '../lib/stats/filters'
   import { computeMetrics } from '../lib/stats/metrics'
   import { granularityFor, trendSeries } from '../lib/stats/series'
@@ -14,6 +14,7 @@
     saveCache,
     stripCompleted,
     stripEvent,
+    stripOpenTask,
   } from '../lib/todoist/cache'
   import StatCard from './StatCard.svelte'
   import ProjectTree from './ProjectTree.svelte'
@@ -36,6 +37,7 @@
   let projects = $state<Project[]>([])
   let events = $state<ActivityEvent[]>([])
   let completed = $state<CompletedItem[]>([])
+  let openTasks = $state<OpenTask[]>([])
   let loading = $state(true)
   let error = $state<string | null>(null)
 
@@ -45,7 +47,7 @@
   let account = ''
   let hydrated = false
   let toppedUp = false
-  let projectsFetched = false
+  let snapshotFetched = false
 
   // Re-runs only on preset change; untrack() keeps sync()'s state reads from
   // becoming dependencies (which would loop).
@@ -60,7 +62,14 @@
   async function persist() {
     if (fetchedSince == null || !account) return
     try {
-      await saveCache(account, cacheKey, { fetchedSince, events, completed, projects, savedAt: Date.now() })
+      await saveCache(account, cacheKey, {
+        fetchedSince,
+        events,
+        completed,
+        projects,
+        openTasks,
+        savedAt: Date.now(),
+      })
     } catch {
       /* cache is best-effort */
     }
@@ -80,14 +89,17 @@
           events = c.events
           completed = c.completed
           projects = c.projects
+          openTasks = c.openTasks ?? []
           fetchedSince = c.fetchedSince
         }
       }
 
-      // 2) Refresh projects once per session (keeps the tree current).
-      if (!projectsFetched) {
-        projectsFetched = true
-        projects = await client.listProjects()
+      // 2) Refresh current snapshots (projects + open tasks) once per session.
+      if (!snapshotFetched) {
+        snapshotFetched = true
+        const [pj, ot] = await Promise.all([client.listProjects(), client.listOpenTasks()])
+        projects = pj
+        openTasks = ot.map(stripOpenTask)
       }
 
       // 3) Top-up activity newer than what we have (once per session).
@@ -146,7 +158,7 @@
   const hasData = $derived(
     Object.values(metrics.counts).some((n) => n > 0) || metrics.meanTimeToCompleteMs != null,
   )
-  const insights = $derived(computeInsights(events, completed, projects, filters))
+  const insights = $derived(computeInsights(events, completed, projects, openTasks, filters))
 
   const PRESETS: TimePreset[] = ['week', 'month', 'quarter', 'year']
   const PRIORITIES: { label: string; value: number | null }[] = [

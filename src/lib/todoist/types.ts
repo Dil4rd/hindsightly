@@ -50,6 +50,14 @@ export interface CompletedItem {
   due: unknown | null
 }
 
+export interface OpenTask {
+  id: string
+  content: string
+  project_id: string
+  priority: number // 1..4, 4 = highest
+  added_at: string
+}
+
 export interface Page<T> {
   results?: T[]
   items?: T[]

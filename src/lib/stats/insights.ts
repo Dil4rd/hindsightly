@@ -2,7 +2,7 @@
 // questions. Pure — computed from the same in-scope data as the metrics, so it
 // follows the time / project / priority filters.
 
-import type { ActivityEvent, CompletedItem, Project } from '../todoist/types'
+import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../todoist/types'
 import { classify } from './events'
 import { completedInScope, eventInScope, type Filters } from './filters'
 
@@ -39,6 +39,7 @@ export function computeInsights(
   events: ActivityEvent[],
   completed: CompletedItem[],
   projects: Project[],
+  openTasks: OpenTask[],
   filters: Filters,
 ): Insight[] {
   const evs = events.filter((e) => eventInScope(e, filters))
@@ -207,6 +208,102 @@ export function computeInsights(
       title: `${pct(postponed, postponed + closed)}% push-vs-do`,
       detail: `You postponed ${postponed} task(s) vs closing ${closed} — a lot of pushing relative to doing.`,
     })
+  }
+
+  // ---- Stale open tasks (current snapshot; project/priority filtered) ----
+  const nowMs = filters.until.getTime()
+  const STALE_MS = 30 * DAY
+  const scopedOpen = openTasks.filter(
+    (t) =>
+      (!filters.projectIds || filters.projectIds.has(t.project_id)) &&
+      (filters.priority == null || t.priority === filters.priority),
+  )
+  if (scopedOpen.length) {
+    const stale = scopedOpen.filter((t) => nowMs - Date.parse(t.added_at) > STALE_MS)
+    if (stale.length) {
+      const oldest = Math.max(...stale.map((t) => nowMs - Date.parse(t.added_at)))
+      out.push({
+        category: 'right-tasks',
+        tone: 'warn',
+        title: `${stale.length} open task${stale.length > 1 ? 's' : ''} older than 30 days`,
+        detail: `Long-open tasks may be stuck, stale, or need breaking down (oldest: ${Math.round(oldest / DAY)} days).`,
+      })
+    } else {
+      out.push({
+        category: 'right-tasks',
+        tone: 'good',
+        title: 'No stale open tasks',
+        detail: 'Every open task in scope is under 30 days old.',
+      })
+    }
+  }
+
+  // ---- Throughput trend (closed: recent half vs earlier half of the window) ----
+  const mid = (filters.since.getTime() + nowMs) / 2
+  let closedEarly = 0
+  let closedLate = 0
+  for (const e of evs) {
+    if (classify(e).includes('closed')) {
+      if (Date.parse(e.event_date) < mid) closedEarly++
+      else closedLate++
+    }
+  }
+  if (closedEarly + closedLate >= 6) {
+    if (closedLate >= closedEarly * 1.25) {
+      out.push({
+        category: 'execution',
+        tone: 'good',
+        title: 'Throughput improving',
+        detail: `Closed ${closedLate} in the recent half vs ${closedEarly} earlier in this period.`,
+      })
+    } else if (closedEarly >= closedLate * 1.25) {
+      out.push({
+        category: 'execution',
+        tone: 'warn',
+        title: 'Throughput declining',
+        detail: `Closed ${closedLate} in the recent half vs ${closedEarly} earlier in this period.`,
+      })
+    } else {
+      out.push({
+        category: 'execution',
+        tone: 'info',
+        title: 'Throughput steady',
+        detail: 'Your closing pace is roughly flat across this period.',
+      })
+    }
+  }
+
+  // ---- Per-priority completion rate (closed/opened by priority) ----
+  const openedByPri = new Map<number, number>()
+  const closedByPri = new Map<number, number>()
+  for (const e of evs) {
+    const p = e.extra_data?.priority ?? 1 // default priority when unset
+    const buckets = classify(e)
+    if (buckets.includes('opened')) openedByPri.set(p, (openedByPri.get(p) ?? 0) + 1)
+    if (buckets.includes('closed')) closedByPri.set(p, (closedByPri.get(p) ?? 0) + 1)
+  }
+  const rate = (p: number) => {
+    const o = openedByPri.get(p) ?? 0
+    return o ? Math.round((100 * (closedByPri.get(p) ?? 0)) / o) : null
+  }
+  const r1 = rate(4) // P1 (highest)
+  const r4 = rate(1) // P4 (lowest)
+  if (r1 != null && r4 != null) {
+    out.push(
+      r1 >= r4
+        ? {
+            category: 'prioritization',
+            tone: 'good',
+            title: `P1 completion ${r1}% ≥ P4 ${r4}%`,
+            detail: 'You close a higher share of high-priority tasks than low — priorities drive completion.',
+          }
+        : {
+            category: 'prioritization',
+            tone: 'warn',
+            title: `P1 completion ${r1}% < P4 ${r4}%`,
+            detail: 'You close a smaller share of high-priority tasks than low — high-priority work may be stalling.',
+          },
+    )
   }
 
   return out

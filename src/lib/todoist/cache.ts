@@ -5,13 +5,14 @@
 
 import { b64uDecode, b64uEncode } from '../auth/webauthn'
 import { cacheGet, cacheSet } from '../auth/idb'
-import type { ActivityEvent, CompletedItem, Project } from './types'
+import type { ActivityEvent, CompletedItem, OpenTask, Project } from './types'
 
 export interface CachePayload {
   fetchedSince: number // earliest event timestamp covered (ms)
   events: ActivityEvent[]
   completed: CompletedItem[]
   projects: Project[]
+  openTasks: OpenTask[]
   savedAt: number
 }
 
@@ -48,6 +49,10 @@ export function stripEvent(e: ActivityEvent): ActivityEvent {
       has_time: ed.has_time,
     },
   }
+}
+
+export function stripOpenTask(t: OpenTask): OpenTask {
+  return { id: t.id, content: '', project_id: t.project_id, priority: t.priority, added_at: t.added_at }
 }
 
 export function stripCompleted(c: CompletedItem): CompletedItem {

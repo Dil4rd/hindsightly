@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { computeInsights } from '../src/lib/stats/insights'
 import type { Filters } from '../src/lib/stats/filters'
-import type { ActivityEvent, ActivityExtraData, CompletedItem, Project } from '../src/lib/todoist/types'
+import type {
+  ActivityEvent,
+  ActivityExtraData,
+  CompletedItem,
+  OpenTask,
+  Project,
+} from '../src/lib/todoist/types'
 
 function ev(
   event_type: ActivityEvent['event_type'],
@@ -29,6 +35,10 @@ function proj(id: string): Project {
   return { id, name: `proj ${id}`, parent_id: null, child_order: 0, is_archived: false, is_deleted: false }
 }
 
+function open(id: string, added: string, priority = 1): OpenTask {
+  return { id, content: '', project_id: 'P1', priority, added_at: added }
+}
+
 const filters: Filters = {
   since: new Date('2026-06-01T00:00:00Z'),
   until: new Date('2026-06-30T23:59:59Z'),
@@ -49,8 +59,12 @@ describe('computeInsights', () => {
     done('2026-06-01T00:00:00Z', '2026-06-06T00:00:00Z', 1), // P4, 5 days
   ]
   const projects = [proj('P1'), proj('P2')] // P2 has no activity
+  const openTasks = [
+    open('t1', '2026-04-01T00:00:00Z'), // ~90 days before window end → stale
+    open('t2', '2026-06-20T00:00:00Z'), // recent → not stale
+  ]
 
-  const insights = computeInsights(events, completed, projects, filters)
+  const insights = computeInsights(events, completed, projects, openTasks, filters)
   const titles = insights.map((i) => i.title)
 
   it('flags a serial postponer (task A postponed 3x)', () => {
@@ -67,5 +81,8 @@ describe('computeInsights', () => {
   })
   it('reports the closed-vs-opened ratio', () => {
     expect(has(titles, /Closed 40% of what you opened/)).toBe(true)
+  })
+  it('flags stale open tasks older than 30 days', () => {
+    expect(has(titles, /open task.*older than 30 days/)).toBe(true)
   })
 })
