@@ -14,6 +14,8 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
   and per-priority completion rate.
 - Light theme with a toggle (persists; defaults to the OS preference). The chart
   follows the theme.
+- Plan awareness — month/quarter/year are disabled on free Todoist accounts
+  (their activity log keeps only ~7 days); detected via `is_premium`.
 
 ### Changed
 

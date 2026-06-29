@@ -50,6 +50,7 @@
   let events = $state<ActivityEvent[]>([])
   let completed = $state<CompletedItem[]>([])
   let openTasks = $state<OpenTask[]>([])
+  let isPremium = $state(true) // assume Pro until detected (avoids flashing disabled)
   let loading = $state(true)
   let error = $state<string | null>(null)
 
@@ -80,6 +81,7 @@
         completed,
         projects,
         openTasks,
+        isPremium,
         savedAt: Date.now(),
       })
     } catch {
@@ -102,16 +104,22 @@
           completed = c.completed
           projects = c.projects
           openTasks = c.openTasks ?? []
+          isPremium = c.isPremium ?? true
           fetchedSince = c.fetchedSince
         }
       }
 
-      // 2) Refresh current snapshots (projects + open tasks) once per session.
+      // 2) Refresh current snapshots (projects, open tasks, plan) once per session.
       if (!snapshotFetched) {
         snapshotFetched = true
-        const [pj, ot] = await Promise.all([client.listProjects(), client.listOpenTasks()])
+        const [pj, ot, premium] = await Promise.all([
+          client.listProjects(),
+          client.listOpenTasks(),
+          client.isPremium(),
+        ])
         projects = pj
         openTasks = ot.map(stripOpenTask)
+        isPremium = premium
       }
 
       // 3) Top-up activity newer than what we have (once per session).
@@ -203,7 +211,16 @@
   <div class="controls">
     <div class="seg">
       {#each PRESETS as p (p)}
-        <button class:active={preset === p} onclick={() => (preset = p)}>{p}</button>
+        <button
+          class:active={preset === p}
+          disabled={!isPremium && p !== 'week'}
+          title={!isPremium && p !== 'week'
+            ? 'Requires Todoist Pro — free accounts keep only 7 days of activity'
+            : ''}
+          onclick={() => (preset = p)}
+        >
+          {p}
+        </button>
       {/each}
     </div>
     <div class="seg">
@@ -355,6 +372,10 @@
   .seg button.active {
     background: var(--accent);
     color: #fff;
+  }
+  .seg button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
   .status {
     margin: 0 0 1rem;

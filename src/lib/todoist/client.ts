@@ -58,6 +58,22 @@ export class TodoistClient {
   }
 
   /**
+   * Whether the account is Todoist Pro. Reads only the `is_premium` flag — the
+   * rest of the /user payload (email, name, token) is discarded, never stored.
+   * Free accounts keep only ~7 days of activity log, so longer windows are gated.
+   */
+  async isPremium(): Promise<boolean> {
+    const res = await fetch(new URL(BASE + '/api/v1/user'), {
+      method: 'GET',
+      credentials: 'omit',
+      headers: { Authorization: `Bearer ${this.token}` },
+    })
+    if (!res.ok) throw new Error(`Todoist API ${res.status}`)
+    const user = (await res.json()) as { is_premium?: boolean }
+    return user.is_premium === true
+  }
+
+  /**
    * Item activity events with `event_date >= since`. Events come newest-first,
    * so we page until a page reaches older than the window, then trim.
    */

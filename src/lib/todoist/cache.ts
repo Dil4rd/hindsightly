@@ -13,6 +13,7 @@ export interface CachePayload {
   completed: CompletedItem[]
   projects: Project[]
   openTasks: OpenTask[]
+  isPremium: boolean
   savedAt: number
 }
 
