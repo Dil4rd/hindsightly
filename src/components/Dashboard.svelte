@@ -21,9 +21,21 @@
   import TrendChart from './TrendChart.svelte'
   import InsightList from './InsightList.svelte'
   import Logo from './Logo.svelte'
+  import ThemeToggle from './ThemeToggle.svelte'
 
-  let { token, cacheKey, onLock }: { token: string; cacheKey: CryptoKey; onLock: () => void } =
-    $props()
+  let {
+    token,
+    cacheKey,
+    theme,
+    onToggleTheme,
+    onLock,
+  }: {
+    token: string
+    cacheKey: CryptoKey
+    theme: 'dark' | 'light'
+    onToggleTheme: () => void
+    onLock: () => void
+  } = $props()
 
   const now = new Date()
   const client = $derived(new TodoistClient(token))
@@ -180,6 +192,7 @@
   <header>
     <h1><span class="logo"><Logo size={22} /></span> Hindsightly</h1>
     <div class="actions">
+      <ThemeToggle {theme} onToggle={onToggleTheme} />
       <button class="ghost" onclick={refresh} disabled={loading}>
         {loading ? 'Loading…' : 'Refresh'}
       </button>
@@ -265,7 +278,7 @@
       <section class="chart-wrap">
         <h2>Opened vs. closed per {granularity === 'week' ? 'week' : 'day'}</h2>
         {#if hasData}
-          <TrendChart {series} />
+          <TrendChart {series} {theme} />
         {:else}
           <p class="empty">No activity in this period.</p>
         {/if}

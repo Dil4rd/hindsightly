@@ -12,6 +12,8 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 - Deeper insights — stale open tasks, throughput trend (improving/declining),
   and per-priority completion rate.
+- Light theme with a toggle (persists; defaults to the OS preference). The chart
+  follows the theme.
 
 ### Changed
 

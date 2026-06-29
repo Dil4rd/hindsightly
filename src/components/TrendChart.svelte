@@ -3,13 +3,23 @@
   import 'uplot/dist/uPlot.min.css'
   import type { TrendSeries } from '../lib/stats/series'
 
-  let { series }: { series: TrendSeries } = $props()
+  let { series, theme }: { series: TrendSeries; theme: 'dark' | 'light' } = $props()
 
   const OPENED = '#5ac8fa'
   const CLOSED = '#79d18a'
 
   let el: HTMLDivElement
   let chart: uPlot | undefined
+  let builtTheme: string | undefined
+
+  // Axis/grid/weekend colors come from CSS vars so they follow the theme.
+  const cssVar = (name: string, fallback: string) => {
+    const v = el ? getComputedStyle(el).getPropertyValue(name).trim() : ''
+    return v || fallback
+  }
+  const axisColor = () => cssVar('--muted', '#9a8f84')
+  const gridColor = () => cssVar('--border', '#2e2823')
+  const weekendColor = () => cssVar('--weekend', 'rgba(124, 132, 170, 0.1)')
 
   // Custom-legend hover state (uPlot's own legend is disabled).
   let hover = $state(false)
@@ -56,7 +66,7 @@
           ctx.beginPath()
           ctx.rect(left, top, width, height)
           ctx.clip()
-          ctx.fillStyle = 'rgba(124, 132, 170, 0.10)'
+          ctx.fillStyle = weekendColor()
           for (const sec of xs) {
             const dow = new Date(sec * 1000).getUTCDay()
             if (dow !== 0 && dow !== 6) continue
@@ -107,9 +117,9 @@
       ],
       axes: [
         {
-          stroke: '#9a8f84',
-          grid: { stroke: '#2e2823' },
-          ticks: { stroke: '#2e2823' },
+          stroke: axisColor(),
+          grid: { stroke: gridColor() },
+          ticks: { stroke: gridColor() },
           incrs: AXIS_INCRS,
           space: 44, // min px per tick (narrow 2-line labels → denser ticks)
           size: 54, // room for two label lines (date + weekday) without clipping
@@ -123,9 +133,9 @@
             }),
         },
         {
-          stroke: '#9a8f84',
-          grid: { stroke: '#2e2823' },
-          ticks: { stroke: '#2e2823' },
+          stroke: axisColor(),
+          grid: { stroke: gridColor() },
+          ticks: { stroke: gridColor() },
           incrs: Y_INCRS, // integers only
           values: (_u, splits) => splits.map((v) => (v == null ? '' : String(v))),
         },
@@ -135,9 +145,13 @@
 
   // (Re)build when data identity changes; resize with the container.
   $effect(() => {
+    const t = theme
     const data = toData(series)
-    if (!chart) {
+    // Recreate on theme change so axis/grid colors update; otherwise just setData.
+    if (!chart || builtTheme !== t) {
+      chart?.destroy()
       chart = new uPlot(options(el.clientWidth || 600), data, el)
+      builtTheme = t
     } else {
       chart.setData(data)
     }

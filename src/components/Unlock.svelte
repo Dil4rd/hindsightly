@@ -9,8 +9,17 @@
   } from '../lib/auth/vault'
   import { isWebAuthnAvailable } from '../lib/auth/webauthn'
   import Logo from './Logo.svelte'
+  import ThemeToggle from './ThemeToggle.svelte'
 
-  let { onUnlocked }: { onUnlocked: (token: string, cacheKey: CryptoKey) => void } = $props()
+  let {
+    onUnlocked,
+    theme,
+    onToggleTheme,
+  }: {
+    onUnlocked: (token: string, cacheKey: CryptoKey) => void
+    theme: 'dark' | 'light'
+    onToggleTheme: () => void
+  } = $props()
 
   const supported = isWebAuthnAvailable()
 
@@ -71,6 +80,7 @@
 </script>
 
 <main class="unlock">
+  <div class="topbar"><ThemeToggle {theme} onToggle={onToggleTheme} /></div>
   <h1><span class="logo"><Logo size={26} /></span> Hindsightly</h1>
 
   {#if !supported}
@@ -114,6 +124,11 @@
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 14px;
+  }
+  .topbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.25rem;
   }
   h1 {
     margin-top: 0;
