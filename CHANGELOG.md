@@ -51,5 +51,5 @@ Initial release.
 - Release-on-tag GitHub workflow.
 - Logo + favicon.
 
-[Unreleased]: https://example.com/compare/v0.1.0...HEAD
-[0.1.0]: https://example.com/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Dil4rd/hindsight/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Dil4rd/hindsight/releases/tag/v0.1.0

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Self-contained static dashboard for Todoist task statistics, secured with passkey (WebAuthn PRF) encryption.",
+  "repository": { "type": "git", "url": "https://github.com/Dil4rd/hindsight.git" },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
