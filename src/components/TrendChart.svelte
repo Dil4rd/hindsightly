@@ -12,14 +12,12 @@
   let chart: uPlot | undefined
   let builtTheme: string | undefined
 
-  // Axis/grid/weekend colors come from CSS vars so they follow the theme.
-  const cssVar = (name: string, fallback: string) => {
-    const v = el ? getComputedStyle(el).getPropertyValue(name).trim() : ''
-    return v || fallback
+  // Chart colors per theme (deterministic — uPlot needs concrete strings).
+  const PALETTE = {
+    dark: { axis: '#9a8f84', grid: '#2e2823', weekend: 'rgba(124, 132, 170, 0.1)' },
+    light: { axis: '#8a8178', grid: '#ece7e0', weekend: 'rgba(40, 50, 90, 0.05)' },
   }
-  const axisColor = () => cssVar('--muted', '#9a8f84')
-  const gridColor = () => cssVar('--border', '#2e2823')
-  const weekendColor = () => cssVar('--weekend', 'rgba(124, 132, 170, 0.1)')
+  const pal = () => PALETTE[theme] ?? PALETTE.dark
 
   // Custom-legend hover state (uPlot's own legend is disabled).
   let hover = $state(false)
@@ -66,7 +64,7 @@
           ctx.beginPath()
           ctx.rect(left, top, width, height)
           ctx.clip()
-          ctx.fillStyle = weekendColor()
+          ctx.fillStyle = pal().weekend
           for (const sec of xs) {
             const dow = new Date(sec * 1000).getUTCDay()
             if (dow !== 0 && dow !== 6) continue
@@ -117,9 +115,9 @@
       ],
       axes: [
         {
-          stroke: axisColor(),
-          grid: { stroke: gridColor() },
-          ticks: { stroke: gridColor() },
+          stroke: pal().axis,
+          grid: { stroke: pal().grid },
+          ticks: { stroke: pal().grid },
           incrs: AXIS_INCRS,
           space: 44, // min px per tick (narrow 2-line labels → denser ticks)
           size: 54, // room for two label lines (date + weekday) without clipping
@@ -133,9 +131,9 @@
             }),
         },
         {
-          stroke: axisColor(),
-          grid: { stroke: gridColor() },
-          ticks: { stroke: gridColor() },
+          stroke: pal().axis,
+          grid: { stroke: pal().grid },
+          ticks: { stroke: pal().grid },
           incrs: Y_INCRS, // integers only
           values: (_u, splits) => splits.map((v) => (v == null ? '' : String(v))),
         },
