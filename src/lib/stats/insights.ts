@@ -240,6 +240,7 @@ export function computeInsights(
   // ---- Stale open tasks (current snapshot; project/priority filtered) ----
   const nowMs = filters.until.getTime()
   const STALE_MS = 30 * DAY
+  const STALE_PROJECT_MIN = 5 // flag projects accumulating this many stale tasks
   const scopedOpen = openTasks.filter(
     (t) =>
       (!filters.projectIds || filters.projectIds.has(t.project_id)) &&
@@ -268,6 +269,27 @@ export function computeInsights(
         tone: 'good',
         title: 'No stale open tasks',
         detail: 'Every open task in scope is under 30 days old.',
+      })
+    }
+
+    // Projects accumulating many stale tasks (structure signal).
+    const staleByProject = new Map<string, number>()
+    for (const t of stale) staleByProject.set(t.project_id, (staleByProject.get(t.project_id) ?? 0) + 1)
+    const heavy = [...staleByProject.entries()]
+      .filter(([, n]) => n >= STALE_PROJECT_MIN)
+      .sort((a, b) => b[1] - a[1])
+    if (heavy.length) {
+      out.push({
+        category: 'structure',
+        tone: 'warn',
+        title: `${heavy.length} project${heavy.length > 1 ? 's' : ''} with many stale tasks`,
+        detail: 'Projects piling up long-open tasks may be overloaded, stalled, or need pruning.',
+        items: heavy.map(([id, n]) => ({
+          id,
+          label: projects.find((p) => p.id === id)?.name,
+          meta: `${n} stale`,
+          href: projectHref(id),
+        })),
       })
     }
   }

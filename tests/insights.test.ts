@@ -93,4 +93,11 @@ describe('computeInsights', () => {
     const ins = insights.find((i) => /postponed 3\+/.test(i.title))
     expect(ins?.items?.some((it) => it.id === 'A' && it.href.includes('/task/A'))).toBe(true)
   })
+
+  it('flags projects accumulating many stale tasks', () => {
+    const many = Array.from({ length: 5 }, (_, i) => open(`s${i}`, '2026-04-01T00:00:00Z'))
+    const res = computeInsights([], [], [proj('P1')], many, filters)
+    const ins = res.find((i) => /project.*many stale tasks/.test(i.title))
+    expect(ins?.items?.some((it) => it.id === 'P1' && it.meta === '5 stale')).toBe(true)
+  })
 })
