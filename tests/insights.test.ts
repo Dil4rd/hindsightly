@@ -124,6 +124,26 @@ describe('computeInsights', () => {
     expect(res.some((i) => /older than 30 days/.test(i.title))).toBe(false)
   })
 
+  it('per-priority completion is cohort-based and bounded (no >100%)', () => {
+    const added = (id: string, pri: number) => ev('added', id, { priority: pri })
+    const comp = (id: string): CompletedItem => ({
+      id,
+      content: '',
+      project_id: 'P1',
+      priority: 1,
+      added_at: '2026-06-05T00:00:00Z',
+      completed_at: '2026-06-10T00:00:00Z',
+      due: null,
+    })
+    const evts = [
+      added('a1', 4), added('a2', 4), added('a3', 4), added('a4', 4), // 4 created P1
+      added('b1', 1), added('b2', 1), added('b3', 1), added('b4', 1), // 4 created P4
+    ]
+    const completed = [comp('a1'), comp('a2'), comp('a3'), comp('b1')] // 3 P1 + 1 P4 done
+    const res = computeInsights(evts, completed, [proj('P1')], [], filters)
+    expect(res.some((i) => /P1 completion 75%.*P4 25%/.test(i.title))).toBe(true)
+  })
+
   it('flags projects accumulating many stale tasks', () => {
     const many = Array.from({ length: 5 }, (_, i) => open(`s${i}`, '2026-04-01T00:00:00Z'))
     const res = computeInsights([], [], [proj('P1')], many, filters)

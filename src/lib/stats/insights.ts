@@ -339,18 +339,27 @@ export function computeInsights(
     }
   }
 
-  // ---- Per-priority completion rate (closed/opened by priority) ----
-  const openedByPri = new Map<number, number>()
-  const closedByPri = new Map<number, number>()
+  // ---- Per-priority completion rate ----
+  // Cohort = tasks CREATED in the window (by priority at creation); "completed"
+  // = that same task is now in completed items. Same-cohort, so bounded 0–100%
+  // — unlike closed/opened, which mixes cohorts and can exceed 100%.
+  const cohort = new Map<number, Set<string>>()
   for (const e of evs) {
-    const p = e.extra_data?.priority ?? 1 // default priority when unset
-    const buckets = classify(e)
-    if (buckets.includes('opened')) openedByPri.set(p, (openedByPri.get(p) ?? 0) + 1)
-    if (buckets.includes('closed')) closedByPri.set(p, (closedByPri.get(p) ?? 0) + 1)
+    if (classify(e).includes('opened')) {
+      const p = e.extra_data?.priority ?? 1 // default priority when unset
+      const set = cohort.get(p) ?? new Set<string>()
+      set.add(e.object_id)
+      cohort.set(p, set)
+    }
   }
-  const rate = (p: number) => {
-    const o = openedByPri.get(p) ?? 0
-    return o ? Math.round((100 * (closedByPri.get(p) ?? 0)) / o) : null
+  const completedIds = new Set(done.map((c) => c.id))
+  const MIN_COHORT = 3 // ignore tiny, noisy cohorts
+  const rate = (p: number): number | null => {
+    const set = cohort.get(p)
+    if (!set || set.size < MIN_COHORT) return null
+    let n = 0
+    for (const id of set) if (completedIds.has(id)) n++
+    return Math.round((100 * n) / set.size)
   }
   const r1 = rate(4) // P1 (highest)
   const r4 = rate(1) // P4 (lowest)
@@ -361,13 +370,15 @@ export function computeInsights(
             category: 'prioritization',
             tone: 'good',
             title: `P1 completion ${r1}% ≥ P4 ${r4}%`,
-            detail: 'You close a higher share of high-priority tasks than low — priorities drive completion.',
+            detail:
+              'Of the tasks you created, you finish a higher share of high-priority than low — priorities drive completion.',
           }
         : {
             category: 'prioritization',
             tone: 'warn',
             title: `P1 completion ${r1}% < P4 ${r4}%`,
-            detail: 'You close a smaller share of high-priority tasks than low — high-priority work may be stalling.',
+            detail:
+              'Of the tasks you created, you finish a smaller share of high-priority than low — high-priority work may be stalling.',
           },
     )
   }

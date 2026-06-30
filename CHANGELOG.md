@@ -31,6 +31,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ### Fixed
 
+- Per-priority completion is now a true cohort rate (tasks created in the window
+  that are now completed), bounded 0–100% — was closed÷opened, which mixed
+  cohorts and could read absurd values like 1850%.
 - Stale-tasks insight no longer flags recurring tasks or future-scheduled tasks
   (they're alive/planned, not stuck). Manual postpones of recurring tasks are
   still counted by the serial-postponer insight (marked "recurring").
