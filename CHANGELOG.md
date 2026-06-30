@@ -24,6 +24,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 - Reschedule debounce — multiple due-date changes on the same task within a
   window count as one (typo-correction noise); window via
   `VITE_RESCHEDULE_DEDUP_MIN` (default 10 min).
+- Insight methodology docs (`docs/INSIGHTS.md`) — one card per insight covering
+  what it measures, what it ignores, the data source, and caveats. Each insight
+  in the app links (ⓘ) to its section.
 
 ### Changed
 

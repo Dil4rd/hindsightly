@@ -5,8 +5,11 @@
     type Insight,
     type InsightCategory,
   } from '../lib/stats/insights'
+  import { INSIGHTS_DOC_URL } from '../lib/config'
 
   let { insights, onSelect }: { insights: Insight[]; onSelect: (i: Insight) => void } = $props()
+
+  const docUrl = (id: string) => `${INSIGHTS_DOC_URL}#${id}`
 
   const byCat = $derived(
     Object.fromEntries(
@@ -23,24 +26,34 @@
         <ul>
           {#each byCat[c] as ins, i (i)}
             <li class={ins.tone}>
-              {#if ins.items?.length}
-                <button type="button" class="row clickable" onclick={() => onSelect(ins)}>
-                  <span class="dot" aria-hidden="true"></span>
-                  <span class="text">
-                    <strong>{ins.title}</strong>
-                    <span class="detail">{ins.detail}</span>
-                  </span>
-                  <span class="count">{ins.items.length} ›</span>
-                </button>
-              {:else}
-                <div class="row">
-                  <span class="dot" aria-hidden="true"></span>
-                  <span class="text">
-                    <strong>{ins.title}</strong>
-                    <span class="detail">{ins.detail}</span>
-                  </span>
-                </div>
-              {/if}
+              <div class="rowwrap">
+                {#if ins.items?.length}
+                  <button type="button" class="row clickable" onclick={() => onSelect(ins)}>
+                    <span class="dot" aria-hidden="true"></span>
+                    <span class="text">
+                      <strong>{ins.title}</strong>
+                      <span class="detail">{ins.detail}</span>
+                    </span>
+                    <span class="count">{ins.items.length} ›</span>
+                  </button>
+                {:else}
+                  <div class="row">
+                    <span class="dot" aria-hidden="true"></span>
+                    <span class="text">
+                      <strong>{ins.title}</strong>
+                      <span class="detail">{ins.detail}</span>
+                    </span>
+                  </div>
+                {/if}
+                <a
+                  class="info"
+                  href={docUrl(ins.docId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="How this insight works"
+                  aria-label="How this insight works">ⓘ</a
+                >
+              </div>
             </li>
           {/each}
         </ul>
@@ -76,17 +89,36 @@
     flex-direction: column;
     gap: 0.7rem;
   }
+  .rowwrap {
+    display: flex;
+    align-items: start;
+    gap: 0.4rem;
+  }
   .row {
     display: flex;
     gap: 0.6rem;
     align-items: start;
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
     text-align: left;
     background: none;
     border: none;
     color: inherit;
     font: inherit;
     padding: 0;
+  }
+  .info {
+    flex: 0 0 auto;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    margin-top: 0.1rem;
+    opacity: 0.55;
+  }
+  .info:hover {
+    opacity: 1;
+    color: var(--accent);
   }
   button.clickable {
     cursor: pointer;

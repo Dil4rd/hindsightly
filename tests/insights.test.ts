@@ -89,6 +89,27 @@ describe('computeInsights', () => {
   it('recognizes the priority speed gradient (P1 faster than P4)', () => {
     expect(has(titles, /Higher priorities finish faster/)).toBe(true)
   })
+  it('every insight carries a known docId (anchor in docs/INSIGHTS.md)', () => {
+    const KNOWN = new Set([
+      'serial-postponers',
+      'backlog-balance',
+      'stale-open-tasks',
+      'inactive-projects',
+      'project-concentration',
+      'inbox-usage',
+      'projects-with-many-stale-tasks',
+      'completion-speed-by-priority',
+      'reprioritization-churn',
+      'completion-reliability-by-priority',
+      'closed-vs-opened',
+      'push-vs-do',
+      'throughput-trend',
+    ])
+    for (const i of insights) {
+      expect(i.docId, i.title).toBeTruthy()
+      expect(KNOWN.has(i.docId), `unknown docId: ${i.docId}`).toBe(true)
+    }
+  })
   it('reports the closed-vs-opened ratio', () => {
     expect(has(titles, /Closed 40% of what you opened/)).toBe(true)
   })

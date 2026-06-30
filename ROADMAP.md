@@ -6,14 +6,14 @@ Hindsightly is a retrospective instrument for a Todoist-based GTD practice:
 "did it work out, and what should I adjust?" Items below earn their place by
 serving that goal; this list is curated, not a backlog dump.
 
-## Next — deepen the insight layer
+## Next
 
-The first version (the four questions) is shipped. Worthwhile additions:
-
-- [ ] Throughput trend direction (improving / declining) from the weekly buckets
-- [ ] Stale OPEN tasks — created long ago and still not closed (needs current
-      open tasks, not just activity)
-- [ ] Per-priority completion rate (not only MTTC)
+- [ ] **Worked examples in [docs/INSIGHTS.md](./docs/INSIGHTS.md)** — short,
+      ideally visual "this data → this value, and note it misses X" snippets.
+      Possibly cross-insight (one scenario illustrating several at once). Decide
+      the format before writing.
+- [ ] **Workload balance across P1–P4** — flag a skewed priority mix (e.g. 90%
+      P1, or no P3s). Distinct from the existing speed/reliability insights.
 
 ## Later
 

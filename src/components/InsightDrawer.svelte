@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition'
   import type { Insight } from '../lib/stats/insights'
+  import { INSIGHTS_DOC_URL } from '../lib/config'
 
   let { insight, onClose }: { insight: Insight | null; onClose: () => void } = $props()
 
@@ -16,7 +17,17 @@
   <div class="drawer" transition:fly={{ x: 340, duration: 160 }} role="dialog" aria-modal="true" aria-label={insight.title}>
     <header>
       <strong>{insight.title}</strong>
-      <button class="close" onclick={onClose} aria-label="Close">×</button>
+      <div class="actions">
+        <a
+          class="info"
+          href={`${INSIGHTS_DOC_URL}#${insight.docId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="How this insight works"
+          aria-label="How this insight works">ⓘ</a
+        >
+        <button class="close" onclick={onClose} aria-label="Close">×</button>
+      </div>
     </header>
     <p class="detail">{insight.detail}</p>
 
@@ -64,6 +75,23 @@
   }
   header strong {
     font-size: 1rem;
+  }
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+  }
+  .info {
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1;
+    opacity: 0.7;
+  }
+  .info:hover {
+    opacity: 1;
+    color: var(--accent);
+    text-decoration: none;
   }
   .close {
     background: none;

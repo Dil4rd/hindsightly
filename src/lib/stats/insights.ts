@@ -22,6 +22,7 @@ export interface Insight {
   tone: InsightTone
   title: string
   detail: string
+  docId: string // anchor in docs/INSIGHTS.md explaining how this insight works
   items?: InsightItem[] // offenders, for the actionable drill-down drawer
 }
 
@@ -104,6 +105,7 @@ export function computeInsights(
         ? {
             category: 'right-tasks',
             tone: 'warn',
+            docId: 'serial-postponers',
             title: `${serial.length} task${serial.length > 1 ? 's' : ''} postponed 3+ times`,
             detail:
               'Repeatedly pushed tasks are often the wrong task, too big, or avoided — break them down or drop them.',
@@ -117,6 +119,7 @@ export function computeInsights(
         : {
             category: 'right-tasks',
             tone: 'good',
+            docId: 'serial-postponers',
             title: 'No chronic postponers',
             detail: 'No task was pushed to a later day three or more times.',
           },
@@ -127,6 +130,7 @@ export function computeInsights(
     out.push({
       category: 'right-tasks',
       tone: net > 0 ? 'warn' : 'good',
+      docId: 'backlog-balance',
       title: net > 0 ? `Backlog grew by ${net}` : net < 0 ? `Backlog shrank by ${-net}` : 'Backlog held steady',
       detail: `Opened ${opened}, closed ${closed} in this period.`,
     })
@@ -142,6 +146,7 @@ export function computeInsights(
       out.push({
         category: 'structure',
         tone: 'info',
+        docId: 'inactive-projects',
         title: `${dead.length} project${dead.length > 1 ? 's' : ''} with no activity`,
         detail: 'Inactive projects add noise — consider archiving them.',
         items: dead.map((p) => ({ id: p.id, label: p.name, href: projectHref(p.id) })),
@@ -159,6 +164,7 @@ export function computeInsights(
       out.push({
         category: 'structure',
         tone: 'info',
+        docId: 'project-concentration',
         title: `${share}% of activity in “${name}”`,
         detail: 'Most of your activity is concentrated in a single project.',
       })
@@ -171,6 +177,7 @@ export function computeInsights(
       out.push({
         category: 'structure',
         tone: 'warn',
+        docId: 'inbox-usage',
         title: `${share}% of activity stayed in Inbox`,
         detail: 'Tasks lingering in Inbox usually means they aren’t organized into projects.',
       })
@@ -209,12 +216,14 @@ export function computeInsights(
         ? {
             category: 'prioritization',
             tone: 'good',
+            docId: 'completion-speed-by-priority',
             title: 'Higher priorities finish faster',
             detail: `Mean time to complete by priority: ${parts}.`,
           }
         : {
             category: 'prioritization',
             tone: 'warn',
+            docId: 'completion-speed-by-priority',
             title: 'Priority doesn’t track completion speed',
             detail: `Expected P1 fastest → P4 slowest; actual: ${parts}.`,
           },
@@ -224,6 +233,7 @@ export function computeInsights(
     out.push({
       category: 'prioritization',
       tone: 'warn',
+      docId: 'reprioritization-churn',
       title: `${reprioritized} reprioritizations`,
       detail: 'Frequent priority changes suggest priorities aren’t clear when tasks are created.',
     })
@@ -235,6 +245,7 @@ export function computeInsights(
     out.push({
       category: 'execution',
       tone: ratio >= 0.9 ? 'good' : 'warn',
+      docId: 'closed-vs-opened',
       title: `Closed ${Math.round(ratio * 100)}% of what you opened`,
       detail:
         ratio >= 1
@@ -246,6 +257,7 @@ export function computeInsights(
     out.push({
       category: 'execution',
       tone: 'warn',
+      docId: 'push-vs-do',
       title: `${pct(postponed, postponed + closed)}% push-vs-do`,
       detail: `You postponed ${postponed} task(s) vs closing ${closed} — a lot of pushing relative to doing.`,
     })
@@ -274,6 +286,7 @@ export function computeInsights(
       out.push({
         category: 'right-tasks',
         tone: 'warn',
+        docId: 'stale-open-tasks',
         title: `${stale.length} open task${stale.length > 1 ? 's' : ''} older than 30 days`,
         detail: `Long-open tasks may be stuck, stale, or need breaking down (oldest: ${Math.round(oldest / DAY)} days).`,
         items: byAge.map((t) => ({
@@ -287,6 +300,7 @@ export function computeInsights(
       out.push({
         category: 'right-tasks',
         tone: 'good',
+        docId: 'stale-open-tasks',
         title: 'No stale open tasks',
         detail: 'Every open task in scope is under 30 days old.',
       })
@@ -302,6 +316,7 @@ export function computeInsights(
       out.push({
         category: 'structure',
         tone: 'warn',
+        docId: 'projects-with-many-stale-tasks',
         title: `${heavy.length} project${heavy.length > 1 ? 's' : ''} with many stale tasks`,
         detail: 'Projects piling up long-open tasks may be overloaded, stalled, or need pruning.',
         items: heavy.map(([id, n]) => ({
@@ -329,6 +344,7 @@ export function computeInsights(
       out.push({
         category: 'execution',
         tone: 'good',
+        docId: 'throughput-trend',
         title: 'Throughput improving',
         detail: `Closed ${closedLate} in the recent half vs ${closedEarly} earlier in this period.`,
       })
@@ -336,6 +352,7 @@ export function computeInsights(
       out.push({
         category: 'execution',
         tone: 'warn',
+        docId: 'throughput-trend',
         title: 'Throughput declining',
         detail: `Closed ${closedLate} in the recent half vs ${closedEarly} earlier in this period.`,
       })
@@ -343,6 +360,7 @@ export function computeInsights(
       out.push({
         category: 'execution',
         tone: 'info',
+        docId: 'throughput-trend',
         title: 'Throughput steady',
         detail: 'Your closing pace is roughly flat across this period.',
       })
@@ -395,6 +413,7 @@ export function computeInsights(
         ? {
             category: 'prioritization',
             tone: 'good',
+            docId: 'completion-reliability-by-priority',
             title: `P1 reliability ${rel1}% ≥ P4 ${rel4}%`,
             detail:
               'Of work due this period, you complete a higher share at high priority than low — priorities are reliable. (Tasks postponed out of the period still count as not done.)',
@@ -402,6 +421,7 @@ export function computeInsights(
         : {
             category: 'prioritization',
             tone: 'warn',
+            docId: 'completion-reliability-by-priority',
             title: `P1 reliability ${rel1}% < P4 ${rel4}%`,
             detail:
               'Of work due this period, you complete a smaller share at high priority than low — high-priority commitments may be slipping.',

@@ -8,6 +8,11 @@ No backend. Your Todoist API token is encrypted **on your device** with a
 passkey (WebAuthn PRF) and never leaves the browser. Task data is fetched
 directly browser → Todoist and processed locally.
 
+Beyond the raw stats, an **insight layer** interprets them against four retro
+questions. How each insight is computed — and what it deliberately doesn't
+capture — is documented in [docs/INSIGHTS.md](docs/INSIGHTS.md); every insight in
+the app links (ⓘ) to its section.
+
 ## Security model
 
 - **Passkey-encrypted token.** On first run you paste your Todoist token and

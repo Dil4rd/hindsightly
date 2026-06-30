@@ -8,3 +8,7 @@ const mins = Number(import.meta.env.VITE_RESCHEDULE_DEDUP_MIN)
  * Default 10 minutes; set to 0 to disable.
  */
 export const RESCHEDULE_DEDUP_MS = (Number.isFinite(mins) ? mins : 10) * 60_000
+
+/** Canonical methodology doc; each insight deep-links to its `#docId` anchor. */
+export const INSIGHTS_DOC_URL =
+  'https://github.com/Dil4rd/hindsightly/blob/main/docs/INSIGHTS.md'
