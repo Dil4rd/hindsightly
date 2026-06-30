@@ -189,24 +189,34 @@ export function computeInsights(
       mttc.set(c.priority, g)
     }
   }
-  const hi = mttc.get(4)
-  const lo = mttc.get(1)
-  if (hi?.n && lo?.n) {
-    const hiAvg = hi.total / hi.n
-    const loAvg = lo.total / lo.n
+  // Speed gradient — P1 should finish fastest, P4 slowest.
+  const PRI: Array<[number, string]> = [
+    [4, 'P1'],
+    [3, 'P2'],
+    [2, 'P3'],
+    [1, 'P4'],
+  ]
+  const speed = PRI.map(([p, label]) => {
+    const g = mttc.get(p)
+    return g?.n ? { label, avg: g.total / g.n } : null
+  }).filter((x): x is { label: string; avg: number } => x != null)
+  if (speed.length >= 2) {
+    const parts = speed.map((s) => `${s.label} ${fmtDur(s.avg)}`).join(' · ')
+    let monotonic = true
+    for (let i = 1; i < speed.length; i++) if (speed[i].avg < speed[i - 1].avg) monotonic = false
     out.push(
-      hiAvg <= loAvg
+      monotonic
         ? {
             category: 'prioritization',
             tone: 'good',
-            title: `P1 finishes faster (${fmtDur(hiAvg)} vs P4 ${fmtDur(loAvg)})`,
-            detail: 'High-priority tasks complete sooner than low — priorities are guiding execution.',
+            title: 'Higher priorities finish faster',
+            detail: `Mean time to complete by priority: ${parts}.`,
           }
         : {
             category: 'prioritization',
             tone: 'warn',
-            title: `P1 is slower than P4 (${fmtDur(hiAvg)} vs ${fmtDur(loAvg)})`,
-            detail: 'High-priority tasks take longer than low — priorities may not reflect what you do.',
+            title: 'Priority doesn’t track completion speed',
+            detail: `Expected P1 fastest → P4 slowest; actual: ${parts}.`,
           },
     )
   }
@@ -339,46 +349,62 @@ export function computeInsights(
     }
   }
 
-  // ---- Per-priority completion rate ----
-  // Cohort = tasks CREATED in the window (by priority at creation); "completed"
-  // = that same task is now in completed items. Same-cohort, so bounded 0–100%
-  // — unlike closed/opened, which mixes cohorts and can exceed 100%.
-  const cohort = new Map<number, Set<string>>()
+  // ---- Per-priority reliability (of work DUE this period, what share done) ----
+  // "Scheduled for this period" = due in the window at any point — INCLUDING
+  // tasks postponed/rescheduled OUT of it, so deferring instead of completing
+  // doesn't quietly inflate the rate. Bounded 0–100%.
+  const winStart = filters.since.getTime()
+  const winEnd = nowMs
+  const inWin = (s?: string | null) => {
+    if (!s) return false
+    const t = Date.parse(s)
+    return Number.isFinite(t) && t >= winStart && t <= winEnd
+  }
+  const scheduledDue = new Map<number, Set<string>>() // due this period, by priority
+  const completedDue = new Map<number, Set<string>>() // ...and completed
+  const mark = (m: Map<number, Set<string>>, p: number, id: string) => {
+    const s = m.get(p) ?? new Set<string>()
+    s.add(id)
+    m.set(p, s)
+  }
   for (const e of evs) {
-    if (classify(e).includes('opened')) {
-      const p = e.extra_data?.priority ?? 1 // default priority when unset
-      const set = cohort.get(p) ?? new Set<string>()
-      set.add(e.object_id)
-      cohort.set(p, set)
+    const x = e.extra_data ?? {}
+    const p = x.priority ?? 1
+    if (classify(e).includes('closed') && inWin(x.completed_due_date)) {
+      mark(scheduledDue, p, e.object_id)
+      mark(completedDue, p, e.object_id)
+    }
+    // Due moved OUT of the window (was due in, now isn't) — scheduled, not done.
+    if ('last_due_date' in x && inWin(x.last_due_date) && !inWin(x.due_date)) {
+      mark(scheduledDue, p, e.object_id)
     }
   }
-  const completedIds = new Set(done.map((c) => c.id))
-  const MIN_COHORT = 3 // ignore tiny, noisy cohorts
-  const rate = (p: number): number | null => {
-    const set = cohort.get(p)
-    if (!set || set.size < MIN_COHORT) return null
-    let n = 0
-    for (const id of set) if (completedIds.has(id)) n++
-    return Math.round((100 * n) / set.size)
+  for (const t of openTasks) if (inWin(t.dueDate)) mark(scheduledDue, t.priority, t.id)
+
+  const MIN_DUE = 3 // ignore tiny, noisy cohorts
+  const reliability = (p: number): number | null => {
+    const all = scheduledDue.get(p)
+    if (!all || all.size < MIN_DUE) return null
+    return Math.round((100 * (completedDue.get(p)?.size ?? 0)) / all.size)
   }
-  const r1 = rate(4) // P1 (highest)
-  const r4 = rate(1) // P4 (lowest)
-  if (r1 != null && r4 != null) {
+  const rel1 = reliability(4) // P1 (highest)
+  const rel4 = reliability(1) // P4 (lowest)
+  if (rel1 != null && rel4 != null) {
     out.push(
-      r1 >= r4
+      rel1 >= rel4
         ? {
             category: 'prioritization',
             tone: 'good',
-            title: `P1 completion ${r1}% ≥ P4 ${r4}%`,
+            title: `P1 reliability ${rel1}% ≥ P4 ${rel4}%`,
             detail:
-              'Of the tasks you created, you finish a higher share of high-priority than low — priorities drive completion.',
+              'Of work due this period, you complete a higher share at high priority than low — priorities are reliable. (Tasks postponed out of the period still count as not done.)',
           }
         : {
             category: 'prioritization',
             tone: 'warn',
-            title: `P1 completion ${r1}% < P4 ${r4}%`,
+            title: `P1 reliability ${rel1}% < P4 ${rel4}%`,
             detail:
-              'Of the tasks you created, you finish a smaller share of high-priority than low — high-priority work may be stalling.',
+              'Of work due this period, you complete a smaller share at high priority than low — high-priority commitments may be slipping.',
           },
     )
   }

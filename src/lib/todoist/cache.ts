@@ -48,6 +48,7 @@ export function stripEvent(e: ActivityEvent): ActivityEvent {
       last_priority: ed.last_priority,
       is_recurring: ed.is_recurring,
       has_time: ed.has_time,
+      completed_due_date: ed.completed_due_date,
     },
   }
 }

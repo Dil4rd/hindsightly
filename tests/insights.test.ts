@@ -86,8 +86,8 @@ describe('computeInsights', () => {
   it('flags a project with no activity', () => {
     expect(has(titles, /1 project with no activity/)).toBe(true)
   })
-  it('recognizes P1 completing faster than P4', () => {
-    expect(has(titles, /P1 finishes faster/)).toBe(true)
+  it('recognizes the priority speed gradient (P1 faster than P4)', () => {
+    expect(has(titles, /Higher priorities finish faster/)).toBe(true)
   })
   it('reports the closed-vs-opened ratio', () => {
     expect(has(titles, /Closed 40% of what you opened/)).toBe(true)
@@ -124,24 +124,22 @@ describe('computeInsights', () => {
     expect(res.some((i) => /older than 30 days/.test(i.title))).toBe(false)
   })
 
-  it('per-priority completion is cohort-based and bounded (no >100%)', () => {
-    const added = (id: string, pri: number) => ev('added', id, { priority: pri })
-    const comp = (id: string): CompletedItem => ({
-      id,
-      content: '',
-      project_id: 'P1',
-      priority: 1,
-      added_at: '2026-06-05T00:00:00Z',
-      completed_at: '2026-06-10T00:00:00Z',
-      due: null,
-    })
+  it('per-priority reliability counts work due this period; postpone-out still counts', () => {
+    const completedDue = (id: string, pri: number) =>
+      ev('completed', id, { priority: pri, completed_due_date: '2026-06-10' })
     const evts = [
-      added('a1', 4), added('a2', 4), added('a3', 4), added('a4', 4), // 4 created P1
-      added('b1', 1), added('b2', 1), added('b3', 1), added('b4', 1), // 4 created P4
+      completedDue('c1', 4), completedDue('c2', 4), completedDue('c3', 4), // 3 P1 done (due in window)
+      ev('updated', 'c4', { priority: 4, last_due_date: '2026-06-13', due_date: '2026-07-05' }), // P1 postponed OUT
+      completedDue('d1', 1), // 1 P4 done
     ]
-    const completed = [comp('a1'), comp('a2'), comp('a3'), comp('b1')] // 3 P1 + 1 P4 done
-    const res = computeInsights(evts, completed, [proj('P1')], [], filters)
-    expect(res.some((i) => /P1 completion 75%.*P4 25%/.test(i.title))).toBe(true)
+    const opens = [
+      open('d2', '2026-05-01T00:00:00Z', 1, '2026-06-20'),
+      open('d3', '2026-05-01T00:00:00Z', 1, '2026-06-21'),
+      open('d4', '2026-05-01T00:00:00Z', 1, '2026-06-22'),
+    ]
+    const res = computeInsights(evts, [], [proj('P1')], opens, filters)
+    // P1: 3 done / (3 done + 1 postponed-out) = 75%; P4: 1 done / (1 + 3 open due) = 25%
+    expect(res.some((i) => /P1 reliability 75%.*P4 25%/.test(i.title))).toBe(true)
   })
 
   it('flags projects accumulating many stale tasks', () => {

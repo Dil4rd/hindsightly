@@ -26,6 +26,7 @@ export interface ActivityExtraData {
   priority?: number
   last_priority?: number
   is_recurring?: boolean
+  completed_due_date?: string | null // due date of a completed occurrence
   name?: string
 }
 

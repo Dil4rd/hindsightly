@@ -11,7 +11,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 ### Added
 
 - Deeper insights — stale open tasks, projects accumulating many stale tasks,
-  throughput trend (improving/declining), and per-priority completion rate.
+  throughput trend (improving/declining), a per-priority speed gradient (mean
+  time to complete, P1→P4), and per-priority reliability (share of work due in
+  the period that you complete).
 - Light theme with a toggle (persists; defaults to the OS preference). The chart
   follows the theme.
 - Plan awareness — month/quarter/year are disabled on free Todoist accounts
@@ -31,9 +33,10 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ### Fixed
 
-- Per-priority completion is now a true cohort rate (tasks created in the window
-  that are now completed), bounded 0–100% — was closed÷opened, which mixed
-  cohorts and could read absurd values like 1850%.
+- Per-priority completion reworked into a bounded reliability rate: of work
+  *due* in the period, the share completed (credits earlier-created and recurring
+  completions; tasks postponed out of the period still count as not done). Earlier
+  closed÷opened could read absurd values like 1850%.
 - Stale-tasks insight no longer flags recurring tasks or future-scheduled tasks
   (they're alive/planned, not stuck). Manual postpones of recurring tasks are
   still counted by the serial-postponer insight (marked "recurring").
