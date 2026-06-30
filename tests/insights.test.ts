@@ -36,8 +36,14 @@ function proj(id: string): Project {
   return { id, name: `proj ${id}`, parent_id: null, child_order: 0, is_archived: false, is_deleted: false }
 }
 
-function open(id: string, added: string, priority = 1): OpenTask {
-  return { id, content: '', project_id: 'P1', priority, added_at: added }
+function open(
+  id: string,
+  added: string,
+  priority = 1,
+  dueDate: string | null = null,
+  isRecurring = false,
+): OpenTask {
+  return { id, content: '', project_id: 'P1', priority, added_at: added, dueDate, isRecurring }
 }
 
 const filters: Filters = {
@@ -106,6 +112,16 @@ describe('computeInsights', () => {
     ]
     const res = computeInsights(burst, [], [proj('P1')], [], filters) // default 10-min dedup
     expect(res.some((i) => /postponed 3\+/.test(i.title))).toBe(false)
+  })
+
+  it('does not flag recurring tasks as stale', () => {
+    const res = computeInsights([], [], [proj('P1')], [open('r1', '2026-04-01T00:00:00Z', 1, '2026-07-01', true)], filters)
+    expect(res.some((i) => /older than 30 days/.test(i.title))).toBe(false)
+    expect(res.some((i) => /No stale open tasks/.test(i.title))).toBe(true)
+  })
+  it('does not flag future-scheduled tasks as stale', () => {
+    const res = computeInsights([], [], [proj('P1')], [open('f1', '2026-04-01T00:00:00Z', 1, '2026-07-15')], filters)
+    expect(res.some((i) => /older than 30 days/.test(i.title))).toBe(false)
   })
 
   it('flags projects accumulating many stale tasks', () => {

@@ -7,6 +7,16 @@ import type { ActivityEvent, CompletedItem, OpenTask, Page, Project } from './ty
 
 const BASE = 'https://api.todoist.com'
 
+// Raw active-task shape (subset) — `due` carries recurrence + next date.
+interface RawTask {
+  id: string
+  content: string
+  project_id: string
+  priority: number
+  added_at: string
+  due: { date?: string; is_recurring?: boolean } | null
+}
+
 export class TodoistClient {
   constructor(private readonly token: string) {}
 
@@ -53,8 +63,17 @@ export class TodoistClient {
   }
 
   /** Current active (open) tasks — a snapshot, not windowed. */
-  listOpenTasks(): Promise<OpenTask[]> {
-    return this.paginate<OpenTask>('/api/v1/tasks', { limit: 200 }, (p) => p.results ?? [])
+  async listOpenTasks(): Promise<OpenTask[]> {
+    const raw = await this.paginate<RawTask>('/api/v1/tasks', { limit: 200 }, (p) => p.results ?? [])
+    return raw.map((r) => ({
+      id: r.id,
+      content: r.content,
+      project_id: r.project_id,
+      priority: r.priority,
+      added_at: r.added_at,
+      dueDate: r.due?.date ?? null,
+      isRecurring: !!r.due?.is_recurring,
+    }))
   }
 
   /**

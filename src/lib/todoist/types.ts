@@ -56,6 +56,8 @@ export interface OpenTask {
   project_id: string
   priority: number // 1..4, 4 = highest
   added_at: string
+  dueDate: string | null // next due (YYYY-MM-DD or datetime); timeline only
+  isRecurring: boolean
 }
 
 export interface Page<T> {

@@ -31,6 +31,10 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ### Fixed
 
+- Stale-tasks insight no longer flags recurring tasks or future-scheduled tasks
+  (they're alive/planned, not stuck). Manual postpones of recurring tasks are
+  still counted by the serial-postponer insight (marked "recurring").
+
 - Weekend shading now aligns with each day's bars (was offset half a day, which
   also mislabeled the hovered day).
 - Removed chart drag-to-zoom (unclear as navigation).

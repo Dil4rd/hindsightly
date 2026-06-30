@@ -3,7 +3,7 @@
 // follows the time / project / priority filters.
 
 import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../todoist/types'
-import { classify, countedBuckets, suppressedDueChanges } from './events'
+import { classify, countedBuckets, suppressedDueChanges, toDay } from './events'
 import { completedInScope, eventInScope, type Filters } from './filters'
 import { RESCHEDULE_DEDUP_MS } from '../config'
 
@@ -94,6 +94,7 @@ export function computeInsights(
   const nameById = new Map<string, string>(contentByItem)
   for (const c of completed) if (c.content) nameById.set(c.id, c.content)
   for (const t of openTasks) if (t.content) nameById.set(t.id, t.content)
+  const recurringIds = new Set(openTasks.filter((t) => t.isRecurring).map((t) => t.id))
 
   // ---- Are you tracking the right tasks? ----
   if (postponed > 0) {
@@ -109,7 +110,7 @@ export function computeInsights(
             items: serial.map(([id, n]) => ({
               id,
               label: nameById.get(id),
-              meta: `${n}×`,
+              meta: recurringIds.has(id) ? `${n}× · recurring` : `${n}×`,
               href: taskHref(id),
             })),
           }
@@ -250,7 +251,13 @@ export function computeInsights(
       (filters.priority == null || t.priority === filters.priority),
   )
   if (scopedOpen.length) {
-    const stale = scopedOpen.filter((t) => nowMs - Date.parse(t.added_at) > STALE_MS)
+    // Stale = old AND not actively scheduled: skip recurring tasks (alive
+    // routines) and tasks with a future due date (they're planned, not stuck).
+    const today = toDay(new Date(nowMs).toISOString()) ?? ''
+    const futureScheduled = (t: OpenTask) => t.dueDate != null && (toDay(t.dueDate) ?? '') >= today
+    const stale = scopedOpen.filter(
+      (t) => !t.isRecurring && !futureScheduled(t) && nowMs - Date.parse(t.added_at) > STALE_MS,
+    )
     if (stale.length) {
       const byAge = [...stale].sort((a, b) => Date.parse(a.added_at) - Date.parse(b.added_at))
       const oldest = nowMs - Date.parse(byAge[0].added_at)

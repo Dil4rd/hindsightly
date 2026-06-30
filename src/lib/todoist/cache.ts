@@ -53,7 +53,16 @@ export function stripEvent(e: ActivityEvent): ActivityEvent {
 }
 
 export function stripOpenTask(t: OpenTask): OpenTask {
-  return { id: t.id, content: '', project_id: t.project_id, priority: t.priority, added_at: t.added_at }
+  // Keep ids + timelines (dueDate/isRecurring); drop only the task title.
+  return {
+    id: t.id,
+    content: '',
+    project_id: t.project_id,
+    priority: t.priority,
+    added_at: t.added_at,
+    dueDate: t.dueDate,
+    isRecurring: t.isRecurring,
+  }
 }
 
 export function stripCompleted(c: CompletedItem): CompletedItem {
