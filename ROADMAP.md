@@ -19,6 +19,10 @@ The first version (the four questions) is shipped. Worthwhile additions:
 
 - [ ] **Recurring toggle** — let the user include or exclude recurring completions
       from `closed`.
+- [ ] **Project turnover insight** — projects created vs archived per window, as a
+      repeatable-workflow signal. (Todoist exposes no readable *template* data —
+      the template API is write-only, with no list and no per-project origin — so
+      turnover is the closest feasible proxy, not "template usage".)
 
 ## Distant / someday
 
