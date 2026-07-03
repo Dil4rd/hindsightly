@@ -44,6 +44,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
   (they're alive/planned, not stuck). Manual postpones of recurring tasks are
   still counted by the serial-postponer insight (marked "recurring").
 
+- Chart x-axis gridlines now sit at day/week boundaries (between bar groups), so
+  each label sits centered in its slot instead of directly under a line that cut
+  through the middle of the group.
 - Weekend shading now aligns with each day's bars (was offset half a day, which
   also mislabeled the hovered day).
 - Removed chart drag-to-zoom (unclear as navigation).

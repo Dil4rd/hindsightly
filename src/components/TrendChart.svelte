@@ -50,30 +50,49 @@
   // Integer-only y ticks — task counts are whole numbers (no 0.2, 0.4, …).
   const Y_INCRS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]
 
-  // Shade Sat/Sun behind the series (day view only).
-  function weekendPlugin(): uPlot.Plugin {
+  const stepSec = () => (series.granularity === 'week' ? 7 * DAY_SEC : DAY_SEC)
+
+  // Behind the series: weekend shading (day view) + vertical separators at each
+  // bucket BOUNDARY, so labels sit centered between the lines (one slot per day),
+  // rather than a gridline cutting through the middle of each bar group.
+  function backgroundPlugin(): uPlot.Plugin {
     return {
       hooks: {
         drawClear: (u) => {
-          if (series.granularity !== 'day') return
           const xs = u.data[0] as number[]
           if (!xs?.length) return
           const { ctx } = u
           const { left, top, width, height } = u.bbox
+          const step = stepSec()
           ctx.save()
           ctx.beginPath()
           ctx.rect(left, top, width, height)
           ctx.clip()
-          ctx.fillStyle = pal().weekend
-          for (const sec of xs) {
-            const dow = new Date(sec * 1000).getUTCDay()
-            if (dow !== 0 && dow !== 6) continue
-            // Center the band on the tick (bars straddle the tick), so it aligns
-            // with the weekend bars rather than shifting into the next day.
-            const x0 = u.valToPos(sec - DAY_SEC / 2, 'x', true)
-            const x1 = u.valToPos(sec + DAY_SEC / 2, 'x', true)
-            ctx.fillRect(x0, top, x1 - x0, height)
+
+          // Weekend shading — each band fills exactly its day's slot.
+          if (series.granularity === 'day') {
+            ctx.fillStyle = pal().weekend
+            for (const sec of xs) {
+              const dow = new Date(sec * 1000).getUTCDay()
+              if (dow !== 0 && dow !== 6) continue
+              const x0 = u.valToPos(sec - step / 2, 'x', true)
+              const x1 = u.valToPos(sec + step / 2, 'x', true)
+              ctx.fillRect(x0, top, x1 - x0, height)
+            }
           }
+
+          // Boundary separators — between groups, not through them.
+          ctx.strokeStyle = pal().grid
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          const sep = (sec: number) => {
+            const x = Math.round(u.valToPos(sec, 'x', true)) + 0.5
+            ctx.moveTo(x, top)
+            ctx.lineTo(x, top + height)
+          }
+          for (const sec of xs) sep(sec - step / 2)
+          sep(xs[xs.length - 1] + step / 2)
+          ctx.stroke()
           ctx.restore()
         },
       },
@@ -98,11 +117,13 @@
       height: 240,
       // Headroom so the tallest bar isn't at the top edge and the top tick is labeled.
       scales: {
-        x: { time: true },
+        // Pad by half a bucket so each day/week gets a full slot between the
+        // boundary separators (and edge bars aren't clipped).
+        x: { time: true, range: (_u, dmin, dmax) => [dmin - stepSec() / 2, dmax + stepSec() / 2] },
         y: { range: (_u, _min, max) => [0, Math.max(1, Math.ceil(max * 1.15))] },
       },
       legend: { show: false },
-      plugins: [weekendPlugin()],
+      plugins: [backgroundPlugin()],
       hooks: { setCursor: [onCursor] },
       // Bars are the markers; the legend shows values on hover. Disable
       // drag-to-zoom (not obvious as navigation).
@@ -116,8 +137,11 @@
       axes: [
         {
           stroke: pal().axis,
-          grid: { stroke: pal().grid },
-          ticks: { stroke: pal().grid },
+          // Vertical gridlines are drawn at bucket boundaries by the background
+          // plugin (labels sit centered in the slot between them), so disable
+          // uPlot's own centered x-grid and ticks.
+          grid: { show: false },
+          ticks: { show: false },
           incrs: AXIS_INCRS,
           space: 44, // min px per tick (narrow 2-line labels → denser ticks)
           size: 54, // room for two label lines (date + weekday) without clipping
