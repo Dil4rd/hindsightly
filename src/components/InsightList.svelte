@@ -109,11 +109,11 @@
   }
   .info {
     flex: 0 0 auto;
+    align-self: center; /* vertically centered with the row, matching the › count */
     color: var(--muted);
     text-decoration: none;
-    font-size: 0.85rem;
-    line-height: 1.2;
-    margin-top: 0.1rem;
+    font-size: 0.9rem;
+    line-height: 1;
     opacity: 0.55;
   }
   .info:hover {

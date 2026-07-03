@@ -255,7 +255,17 @@
     </aside>
 
     <main>
-      <section class="cards">
+      {#if hasData}
+        <section class="insights-wrap">
+          <h2>Insights</h2>
+          <InsightList {insights} onSelect={(i) => (selectedInsight = i)} />
+        </section>
+      {/if}
+
+      <details class="general" open>
+        <summary>General info</summary>
+
+        <section class="cards">
         <StatCard label="opened" value={metrics.counts.opened} hint="Tasks created in this window." />
         <StatCard
           label="closed"
@@ -296,21 +306,15 @@
         />
       </section>
 
-      <section class="chart-wrap">
-        <h2>Opened vs. closed per {granularity === 'week' ? 'week' : 'day'}</h2>
-        {#if hasData}
-          <TrendChart {series} {theme} />
-        {:else}
-          <p class="empty">No activity in this period.</p>
-        {/if}
-      </section>
-
-      {#if hasData}
-        <section class="insights-wrap">
-          <h2>Insights</h2>
-          <InsightList {insights} onSelect={(i) => (selectedInsight = i)} />
+        <section class="chart-wrap">
+          <h2>Opened vs. closed per {granularity === 'week' ? 'week' : 'day'}</h2>
+          {#if hasData}
+            <TrendChart {series} {theme} />
+          {:else}
+            <p class="empty">No activity in this period.</p>
+          {/if}
         </section>
-      {/if}
+      </details>
     </main>
   </div>
 
@@ -442,7 +446,34 @@
     color: var(--muted);
   }
   .insights-wrap {
+    margin-top: 0;
+  }
+  .general {
     margin-top: 1.5rem;
+  }
+  .general > summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    list-style: none;
+    user-select: none;
+    margin-bottom: 0.6rem;
+  }
+  .general > summary::-webkit-details-marker {
+    display: none;
+  }
+  .general > summary::before {
+    content: '▾';
+    font-size: 0.9em;
+    transition: transform 0.15s;
+  }
+  .general:not([open]) > summary::before {
+    transform: rotate(-90deg);
   }
   @media (max-width: 640px) {
     .layout {
