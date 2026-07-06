@@ -7,7 +7,11 @@
   } from '../lib/stats/insights'
   import { INSIGHTS_DOC_URL } from '../lib/config'
 
-  let { insights, onSelect }: { insights: Insight[]; onSelect: (i: Insight) => void } = $props()
+  let {
+    insights,
+    onSelect,
+    scoped = false,
+  }: { insights: Insight[]; onSelect: (i: Insight) => void; scoped?: boolean } = $props()
 
   const docUrl = (id: string) => `${INSIGHTS_DOC_URL}#${id}`
 
@@ -22,7 +26,9 @@
   {#each INSIGHT_CATEGORIES as c (c)}
     <section class="group">
       <h3>{INSIGHT_QUESTIONS[c]}</h3>
-      {#if byCat[c].length}
+      {#if c === 'structure' && scoped}
+        <p class="none">Structure is a whole-system view — clear the project filter to see it.</p>
+      {:else if byCat[c].length}
         <ul>
           {#each byCat[c] as ins, i (i)}
             <li class={ins.tone}>

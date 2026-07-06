@@ -32,6 +32,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 - Insights now lead the dashboard; the stat cards + trend chart moved into a
   collapsible "General info" section below (expanded by default).
+- Selecting a project scopes the insights to that subtree with a clearable chip
+  on the Insights heading; the whole-system "structure" insights show a note
+  while a single project is in focus.
 - Trend chart is now a grouped bar histogram (opened vs. closed per day/week)
   with y-axis headroom so the tallest bar isn't clipped.
 - Docker is the primary dev workflow (`compose.yaml`: `docker compose up dev`).

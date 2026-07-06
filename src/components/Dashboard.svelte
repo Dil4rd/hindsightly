@@ -183,6 +183,9 @@
     Object.values(metrics.counts).some((n) => n > 0) || metrics.meanTimeToCompleteMs != null,
   )
   const insights = $derived(computeInsights(events, completed, projects, openTasks, filters))
+  const selectedProject = $derived(
+    selectedProjectId ? (projects.find((p) => p.id === selectedProjectId) ?? null) : null,
+  )
 
   const PRESETS: TimePreset[] = ['week', 'month', 'quarter', 'year']
   const PRIORITIES: { label: string; value: number | null }[] = [
@@ -257,8 +260,21 @@
     <main>
       {#if hasData}
         <section class="insights-wrap">
-          <h2>Insights</h2>
-          <InsightList {insights} onSelect={(i) => (selectedInsight = i)} />
+          <div class="insights-head">
+            <h2>Insights</h2>
+            {#if selectedProject}
+              <span class="scope">
+                {selectedProject.name}
+                <button
+                  class="clear"
+                  onclick={() => (selectedProjectId = null)}
+                  aria-label="Clear project filter"
+                  title="Show all projects">✕</button
+                >
+              </span>
+            {/if}
+          </div>
+          <InsightList {insights} scoped={selectedProjectId !== null} onSelect={(i) => (selectedInsight = i)} />
         </section>
       {/if}
 
@@ -447,6 +463,43 @@
   }
   .insights-wrap {
     margin-top: 0;
+  }
+  .insights-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+  .insights-head h2 {
+    margin: 0;
+  }
+  .scope {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.1rem 0.3rem 0.1rem 0.6rem;
+  }
+  .scope .clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .scope .clear:hover {
+    background: rgba(255, 255, 255, 0.45);
   }
   .general {
     margin-top: 1.5rem;
