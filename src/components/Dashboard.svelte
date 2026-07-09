@@ -46,6 +46,7 @@
   let priority = $state<number | null>(null)
   let selectedProjectId = $state<string | null>(null)
   let selectedInsight = $state<Insight | null>(null)
+  let projOpen = $state(false)
 
   // data
   let projects = $state<Project[]>([])
@@ -186,6 +187,14 @@
   const selectedProject = $derived(
     selectedProjectId ? (projects.find((p) => p.id === selectedProjectId) ?? null) : null,
   )
+  const subCount = $derived(
+    selectedProjectId ? descendantIds(projects, selectedProjectId).size - 1 : 0,
+  )
+  const projLabel = $derived(
+    selectedProject
+      ? `${selectedProject.name} · ${subCount} subproject${subCount === 1 ? '' : 's'}`
+      : 'All projects',
+  )
 
   const PRESETS: TimePreset[] = ['week', 'month', 'quarter', 'year']
   const PRIORITIES: { label: string; value: number | null }[] = [
@@ -202,6 +211,12 @@
     return h < 48 ? `${h.toFixed(1)} h` : `${(h / 24).toFixed(1)} d`
   }
 </script>
+
+<svelte:window
+  onkeydown={(e) => {
+    if (e.key === 'Escape') projOpen = false
+  }}
+/>
 
 <div class="dashboard">
   <header>
@@ -235,6 +250,31 @@
         <button class:active={priority === pr.value} onclick={() => (priority = pr.value)}>{pr.label}</button>
       {/each}
     </div>
+
+    <div class="proj-picker">
+      <button
+        class="proj-btn"
+        class:active={selectedProjectId !== null}
+        aria-haspopup="true"
+        aria-expanded={projOpen}
+        onclick={() => (projOpen = !projOpen)}
+      >
+        <span class="proj-label">{projLabel}</span><span class="caret">▾</span>
+      </button>
+      {#if projOpen}
+        <div class="proj-overlay" role="presentation" onclick={() => (projOpen = false)}></div>
+        <div class="proj-pop">
+          <ProjectTree
+            roots={tree}
+            selectedId={selectedProjectId}
+            onSelect={(id) => {
+              selectedProjectId = id
+              projOpen = false
+            }}
+          />
+        </div>
+      {/if}
+    </div>
   </div>
 
   {#if error}
@@ -252,28 +292,10 @@
   </p>
 
   <div class="layout" class:dim={loading}>
-    <aside>
-      <h2>Projects</h2>
-      <ProjectTree roots={tree} selectedId={selectedProjectId} onSelect={(id) => (selectedProjectId = id)} />
-    </aside>
-
     <main>
       {#if hasData}
         <section class="insights-wrap">
-          <div class="insights-head">
-            <h2>Insights</h2>
-            {#if selectedProject}
-              <span class="scope">
-                {selectedProject.name}
-                <button
-                  class="clear"
-                  onclick={() => (selectedProjectId = null)}
-                  aria-label="Clear project filter"
-                  title="Show all projects">✕</button
-                >
-              </span>
-            {/if}
-          </div>
+          <h2>Insights</h2>
           <InsightList {insights} scoped={selectedProjectId !== null} onSelect={(i) => (selectedInsight = i)} />
         </section>
       {/if}
@@ -426,20 +448,60 @@
     }
   }
   .layout {
-    display: grid;
-    grid-template-columns: 14rem 1fr;
-    gap: 1.5rem;
-    align-items: start;
     transition: opacity 0.15s ease;
   }
   .layout.dim {
     opacity: 0.4;
   }
-  aside {
-    position: sticky;
-    top: 1rem;
-    max-height: 80vh;
+  .proj-picker {
+    position: relative;
+  }
+  .proj-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: 18rem;
+    background: var(--panel);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .proj-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .proj-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .proj-btn .caret {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 0.7rem;
+  }
+  .proj-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+  }
+  .proj-pop {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    z-index: 21;
+    min-width: 15rem;
+    max-width: 22rem;
+    max-height: 60vh;
     overflow: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.5rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   }
   .cards {
     display: grid;
@@ -463,43 +525,6 @@
   }
   .insights-wrap {
     margin-top: 0;
-  }
-  .insights-head {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 0.6rem;
-  }
-  .insights-head h2 {
-    margin: 0;
-  }
-  .scope {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.75rem;
-    background: var(--accent);
-    color: #fff;
-    border-radius: 999px;
-    padding: 0.1rem 0.3rem 0.1rem 0.6rem;
-  }
-  .scope .clear {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.1rem;
-    height: 1.1rem;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.25);
-    color: #fff;
-    font-size: 0.7rem;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .scope .clear:hover {
-    background: rgba(255, 255, 255, 0.45);
   }
   .general {
     margin-top: 1.5rem;
@@ -527,14 +552,5 @@
   }
   .general:not([open]) > summary::before {
     transform: rotate(-90deg);
-  }
-  @media (max-width: 640px) {
-    .layout {
-      grid-template-columns: 1fr;
-    }
-    aside {
-      position: static;
-      max-height: none;
-    }
   }
 </style>
