@@ -3,9 +3,11 @@
   import { TodoistClient } from '../lib/todoist/client'
   import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../lib/todoist/types'
   import { presetWindow, type Filters, type TimePreset } from '../lib/stats/filters'
-  import { computeMetrics } from '../lib/stats/metrics'
+  import { computeMetrics, metricBreakdown } from '../lib/stats/metrics'
+  import { METRIC_BUCKETS, type MetricBucket } from '../lib/stats/types'
   import { granularityFor, trendSeries } from '../lib/stats/series'
   import { computeInsights, type Insight } from '../lib/stats/insights'
+  import type { DrawerPanel } from '../lib/ui'
   import { buildTree, descendantIds } from '../lib/stats/tree'
   import {
     accountKey,
@@ -20,7 +22,7 @@
   import ProjectTree from './ProjectTree.svelte'
   import TrendChart from './TrendChart.svelte'
   import InsightList from './InsightList.svelte'
-  import InsightDrawer from './InsightDrawer.svelte'
+  import DetailDrawer from './DetailDrawer.svelte'
   import Logo from './Logo.svelte'
   import ThemeToggle from './ThemeToggle.svelte'
 
@@ -45,7 +47,7 @@
   let preset = $state<TimePreset>('week')
   let priority = $state<number | null>(null)
   let selectedProjectId = $state<string | null>(null)
-  let selectedInsight = $state<Insight | null>(null)
+  let selectedPanel = $state<DrawerPanel | null>(null)
   let projOpen = $state(false)
 
   // data
@@ -195,6 +197,49 @@
       ? `${selectedProject.name} · ${subCount} subproject${subCount === 1 ? '' : 's'}`
       : 'All projects',
   )
+  const breakdown = $derived(metricBreakdown(events, filters))
+
+  // Display label + tooltip per metric; the title is reused in the drill-down drawer.
+  const METRIC_META: Record<MetricBucket, { title: string; hint: string }> = {
+    opened: { title: 'Opened', hint: 'Tasks created in this window.' },
+    closed: {
+      title: 'Closed',
+      hint: 'Tasks completed (checked off), including recurring-task occurrences.',
+    },
+    postponed: { title: 'Postponed', hint: "A task's due date moved to a LATER day." },
+    rescheduled: { title: 'Rescheduled', hint: "A task's due date moved to an EARLIER day." },
+    scheduled: { title: 'Scheduled', hint: 'A due date was added to a task that had none.' },
+    unscheduled: { title: 'Unscheduled', hint: "A task's due date was removed (set to no date)." },
+    reprioritized: { title: 'Reprioritized', hint: "A task's priority (P1–P4) was changed." },
+  }
+
+  const NOTE = 'Opens in Todoist. Task titles show for this session only.'
+  const fmtDay = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
+  const taskHref = (id: string) => `https://app.todoist.com/app/task/${id}`
+
+  function openMetric(b: MetricBucket) {
+    selectedPanel = {
+      title: METRIC_META[b].title,
+      detail: METRIC_META[b].hint,
+      items: breakdown[b].map((it) => ({
+        id: it.objectId,
+        label: it.content || undefined,
+        meta: fmtDay.format(Date.parse(it.eventDate)),
+        href: taskHref(it.objectId),
+      })),
+      note: NOTE,
+    }
+  }
+
+  function openInsight(i: Insight) {
+    selectedPanel = {
+      title: i.title,
+      detail: i.detail,
+      docId: i.docId,
+      items: i.items ?? [],
+      note: NOTE,
+    }
+  }
 
   const PRESETS: TimePreset[] = ['week', 'month', 'quarter', 'year']
   const PRIORITIES: { label: string; value: number | null }[] = [
@@ -296,7 +341,7 @@
       {#if hasData}
         <section class="insights-wrap">
           <h2>Insights</h2>
-          <InsightList {insights} scoped={selectedProjectId !== null} onSelect={(i) => (selectedInsight = i)} />
+          <InsightList {insights} scoped={selectedProjectId !== null} onSelect={openInsight} />
         </section>
       {/if}
 
@@ -304,45 +349,22 @@
         <summary>Metrics</summary>
 
         <section class="cards">
-        <StatCard label="opened" value={metrics.counts.opened} hint="Tasks created in this window." />
-        <StatCard
-          label="closed"
-          value={metrics.counts.closed}
-          sub={metrics.recurringClosed ? `${metrics.recurringClosed} recurring` : ''}
-          hint="Tasks completed (checked off), including recurring-task occurrences."
-          accent={metrics.counts.closed > 0}
-        />
-        <StatCard
-          label="postponed"
-          value={metrics.counts.postponed}
-          hint="A task's due date moved to a LATER day."
-        />
-        <StatCard
-          label="rescheduled"
-          value={metrics.counts.rescheduled}
-          hint="A task's due date moved to an EARLIER day."
-        />
-        <StatCard
-          label="scheduled"
-          value={metrics.counts.scheduled}
-          hint="A due date was added to a task that had none."
-        />
-        <StatCard
-          label="unscheduled"
-          value={metrics.counts.unscheduled}
-          hint="A task's due date was removed (set to no date)."
-        />
-        <StatCard
-          label="reprioritized"
-          value={metrics.counts.reprioritized}
-          hint="A task's priority (P1–P4) was changed."
-        />
-        <StatCard
-          label="mean time to complete"
-          value={fmtDuration(metrics.meanTimeToCompleteMs)}
-          hint="Average time from creation to completion (non-recurring tasks)."
-        />
-      </section>
+          {#each METRIC_BUCKETS as b (b)}
+            <StatCard
+              label={b}
+              value={metrics.counts[b]}
+              hint={METRIC_META[b].hint}
+              sub={b === 'closed' && metrics.recurringClosed ? `${metrics.recurringClosed} recurring` : ''}
+              accent={b === 'closed' && metrics.counts.closed > 0}
+              onOpen={metrics.counts[b] > 0 ? () => openMetric(b) : undefined}
+            />
+          {/each}
+          <StatCard
+            label="mean time to complete"
+            value={fmtDuration(metrics.meanTimeToCompleteMs)}
+            hint="Average time from creation to completion (non-recurring tasks)."
+          />
+        </section>
 
         <section class="chart-wrap">
           <h2>Opened vs. closed per {granularity === 'week' ? 'week' : 'day'}</h2>
@@ -356,7 +378,7 @@
     </main>
   </div>
 
-  <InsightDrawer insight={selectedInsight} onClose={() => (selectedInsight = null)} />
+  <DetailDrawer panel={selectedPanel} onClose={() => (selectedPanel = null)} />
 </div>
 
 <style>

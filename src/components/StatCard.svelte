@@ -5,21 +5,39 @@
     sub = '',
     hint = '',
     accent = false,
-  }: { label: string; value: string | number; sub?: string; hint?: string; accent?: boolean } =
-    $props()
+    onOpen,
+  }: {
+    label: string
+    value: string | number
+    sub?: string
+    hint?: string
+    accent?: boolean
+    onOpen?: () => void
+  } = $props()
 </script>
 
-<div class="card" class:accent class:has-hint={hint}>
+{#snippet body()}
   <div class="value">{value}</div>
   <div class="label">{label}</div>
   <!-- Always reserve the sub-line slot so value/label align across cards. -->
   <div class="sub">{sub}</div>
   {#if hint}<div class="tip" role="tooltip">{hint}</div>{/if}
-</div>
+{/snippet}
+
+{#if onOpen}
+  <button type="button" class="card clickable" class:accent class:has-hint={hint} onclick={onOpen}>
+    {@render body()}
+  </button>
+{:else}
+  <div class="card" class:accent class:has-hint={hint}>
+    {@render body()}
+  </div>
+{/if}
 
 <style>
   .card {
     position: relative;
+    width: 100%;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -31,12 +49,26 @@
     justify-content: center;
     text-align: center;
     gap: 0.3rem;
+    font: inherit;
+    color: inherit;
   }
   .card.has-hint {
     cursor: help;
   }
   .card.accent {
     border-color: var(--accent);
+  }
+  .card.clickable {
+    cursor: pointer;
+    transition:
+      border-color 0.12s ease,
+      transform 0.06s ease;
+  }
+  .card.clickable:hover {
+    border-color: var(--accent);
+  }
+  .card.clickable:active {
+    transform: translateY(1px);
   }
   .value {
     font-size: 1.9rem;

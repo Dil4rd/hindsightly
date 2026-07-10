@@ -10,6 +10,43 @@ export function emptyCounts(): Record<MetricBucket, number> {
   return Object.fromEntries(METRIC_BUCKETS.map((b) => [b, 0])) as Record<MetricBucket, number>
 }
 
+export interface MetricEventItem {
+  objectId: string
+  eventDate: string
+  content?: string // task title at event time (in-memory only)
+}
+
+/**
+ * The individual events behind each metric count — same in-scope + debounce
+ * rules as computeMetrics, so a bucket's list length equals its count. Used to
+ * drill into a stat card and see the actual tasks.
+ */
+export function metricBreakdown(
+  events: ActivityEvent[],
+  filters: Filters,
+  dedupMs: number = RESCHEDULE_DEDUP_MS,
+): Record<MetricBucket, MetricEventItem[]> {
+  const out = Object.fromEntries(METRIC_BUCKETS.map((b) => [b, [] as MetricEventItem[]])) as Record<
+    MetricBucket,
+    MetricEventItem[]
+  >
+  const inScope = events.filter((e) => eventInScope(e, filters))
+  const suppress = suppressedDueChanges(inScope, dedupMs)
+  for (const e of inScope) {
+    for (const bucket of countedBuckets(e, suppress)) {
+      out[bucket].push({
+        objectId: e.object_id,
+        eventDate: e.event_date,
+        content: e.extra_data?.content ?? undefined,
+      })
+    }
+  }
+  for (const b of METRIC_BUCKETS) {
+    out[b].sort((a, z) => Date.parse(z.eventDate) - Date.parse(a.eventDate))
+  }
+  return out
+}
+
 export function computeMetrics(
   events: ActivityEvent[],
   completed: CompletedItem[],

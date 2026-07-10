@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { computeMetrics } from '../src/lib/stats/metrics'
+import { computeMetrics, metricBreakdown } from '../src/lib/stats/metrics'
+import { METRIC_BUCKETS } from '../src/lib/stats/types'
 import type { Filters } from '../src/lib/stats/filters'
 import type { ActivityEvent, ActivityExtraData, CompletedItem } from '../src/lib/todoist/types'
 
@@ -55,6 +56,13 @@ describe('computeMetrics', () => {
     expect(m.counts.postponed).toBe(1)
     expect(m.counts.reprioritized).toBe(1)
     expect(m.counts.rescheduled).toBe(0)
+  })
+
+  it('metricBreakdown list lengths match the counts', () => {
+    const m = computeMetrics(events, completed, filters())
+    const bd = metricBreakdown(events, filters())
+    for (const b of METRIC_BUCKETS) expect(bd[b].length, b).toBe(m.counts[b])
+    expect(bd.postponed[0].objectId).toBe('x')
   })
 
   it('computes mean time to complete', () => {

@@ -1,46 +1,50 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition'
-  import type { Insight } from '../lib/stats/insights'
   import { INSIGHTS_DOC_URL } from '../lib/config'
+  import type { DrawerPanel } from '../lib/ui'
 
-  let { insight, onClose }: { insight: Insight | null; onClose: () => void } = $props()
+  let { panel, onClose }: { panel: DrawerPanel | null; onClose: () => void } = $props()
 
   function onKey(e: KeyboardEvent) {
-    if (e.key === 'Escape' && insight) onClose()
+    if (e.key === 'Escape' && panel) onClose()
   }
 </script>
 
 <svelte:window onkeydown={onKey} />
 
-{#if insight}
+{#if panel}
   <div class="overlay" transition:fade={{ duration: 120 }} onclick={onClose} role="presentation"></div>
-  <div class="drawer" transition:fly={{ x: 340, duration: 160 }} role="dialog" aria-modal="true" aria-label={insight.title}>
+  <div class="drawer" transition:fly={{ x: 340, duration: 160 }} role="dialog" aria-modal="true" aria-label={panel.title}>
     <header>
-      <strong>{insight.title}</strong>
+      <strong>{panel.title}</strong>
       <div class="actions">
-        <a
-          class="info"
-          href={`${INSIGHTS_DOC_URL}#${insight.docId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="How this insight works"
-          aria-label="How this insight works">ⓘ</a
-        >
+        {#if panel.docId}
+          <a
+            class="info"
+            href={`${INSIGHTS_DOC_URL}#${panel.docId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="How this works"
+            aria-label="How this works">ⓘ</a
+          >
+        {/if}
         <button class="close" onclick={onClose} aria-label="Close">×</button>
       </div>
     </header>
-    <p class="detail">{insight.detail}</p>
+    {#if panel.detail}<p class="detail">{panel.detail}</p>{/if}
 
-    {#if insight.items?.length}
+    {#if panel.items.length}
       <ul>
-        {#each insight.items as it (it.id)}
+        {#each panel.items as it (it.id)}
           <li>
             <a href={it.href} target="_blank" rel="noopener noreferrer">{it.label ?? 'Open task'}</a>
             {#if it.meta}<span class="meta">{it.meta}</span>{/if}
           </li>
         {/each}
       </ul>
-      <p class="hint">Opens in Todoist. Task titles show for this session only.</p>
+      {#if panel.note}<p class="hint">{panel.note}</p>{/if}
+    {:else}
+      <p class="hint">Nothing to show.</p>
     {/if}
   </div>
 {/if}
