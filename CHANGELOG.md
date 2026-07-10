@@ -31,7 +31,7 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 ### Changed
 
 - Insights now lead the dashboard; the stat cards + trend chart moved into a
-  collapsible "General info" section below (expanded by default).
+  collapsible "Metrics" section below (expanded by default).
 - Project filter moved from the left sidebar into a dropdown in the top filter
   row (its label shows the selected project + subproject count; opens/closes on
   click, closes on selection), reclaiming full width for the content. Selecting a

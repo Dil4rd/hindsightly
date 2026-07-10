@@ -301,7 +301,7 @@
       {/if}
 
       <details class="general" open>
-        <summary>General info</summary>
+        <summary>Metrics</summary>
 
         <section class="cards">
         <StatCard label="opened" value={metrics.counts.opened} hint="Tasks created in this window." />
