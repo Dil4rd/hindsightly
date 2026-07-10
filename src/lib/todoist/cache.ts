@@ -49,6 +49,7 @@ export function stripEvent(e: ActivityEvent): ActivityEvent {
       is_recurring: ed.is_recurring,
       has_time: ed.has_time,
       completed_due_date: ed.completed_due_date,
+      was_overdue: ed.was_overdue,
     },
   }
 }

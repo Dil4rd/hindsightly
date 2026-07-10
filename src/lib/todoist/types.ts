@@ -27,6 +27,7 @@ export interface ActivityExtraData {
   last_priority?: number
   is_recurring?: boolean
   completed_due_date?: string | null // due date of a completed occurrence
+  was_overdue?: boolean // whether a completed task was past its due date
   name?: string
 }
 

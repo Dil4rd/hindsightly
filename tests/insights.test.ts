@@ -101,9 +101,11 @@ describe('computeInsights', () => {
       'completion-speed-by-priority',
       'reprioritization-churn',
       'completion-reliability-by-priority',
+      'on-time-by-priority',
       'closed-vs-opened',
       'push-vs-do',
       'throughput-trend',
+      'overdue-now',
     ])
     for (const i of insights) {
       expect(i.docId, i.title).toBeTruthy()
@@ -161,6 +163,29 @@ describe('computeInsights', () => {
     const res = computeInsights(evts, [], [proj('P1')], opens, filters)
     // P1: 3 done / (3 done + 1 postponed-out) = 75%; P4: 1 done / (1 + 3 open due) = 25%
     expect(res.some((i) => /P1 reliability 75%.*P4 25%/.test(i.title))).toBe(true)
+  })
+
+  it('on-time-by-priority splits dated completions by was_overdue', () => {
+    const c = (id: string, pri: number, overdue: boolean) =>
+      ev('completed', id, { priority: pri, completed_due_date: '2026-06-10', was_overdue: overdue })
+    const evts = [
+      c('a1', 4, false), c('a2', 4, false), c('a3', 4, false), c('a4', 4, true), // P1: 3/4 on-time
+      c('b1', 1, false), c('b2', 1, true), c('b3', 1, true), c('b4', 1, true), // P4: 1/4 on-time
+    ]
+    const res = computeInsights(evts, [], [proj('P1')], [], filters)
+    expect(res.some((i) => /P1 on-time 75%.*P4 25%/.test(i.title))).toBe(true)
+  })
+
+  it('flags overdue open tasks (past due, excludes recurring/future)', () => {
+    const opens = [
+      open('o1', '2026-05-01T00:00:00Z', 1, '2026-06-05'), // past due → overdue
+      open('o2', '2026-05-01T00:00:00Z', 1, '2026-07-15'), // future → not
+      open('o3', '2026-05-01T00:00:00Z', 1, '2026-06-05', true), // recurring → excluded
+    ]
+    const res = computeInsights([], [], [proj('P1')], opens, filters)
+    const ins = res.find((i) => /overdue/.test(i.title))
+    expect(ins?.title).toMatch(/1 task overdue/)
+    expect(ins?.items?.some((it) => it.id === 'o1')).toBe(true)
   })
 
   it('flags projects accumulating many stale tasks', () => {

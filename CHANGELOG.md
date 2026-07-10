@@ -14,6 +14,10 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
   throughput trend (improving/declining), a per-priority speed gradient (mean
   time to complete, P1→P4), and per-priority reliability (share of work due in
   the period that you complete).
+- On-time completion by priority — of dated completions, the share finished by
+  their due date (via `was_overdue`), P1 vs P4.
+- Overdue open tasks — currently past-due open tasks (distinct from stale =
+  old + unscheduled), listed oldest-first with days overdue and Todoist links.
 - Light theme with a toggle (persists; defaults to the OS preference). The chart
   follows the theme.
 - Plan awareness — month/quarter/year are disabled on free Todoist accounts

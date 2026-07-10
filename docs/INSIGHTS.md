@@ -131,6 +131,17 @@ Data sources referenced below:
 - **Caveats:** needs ≥ 3 due tasks per priority to report; a task due at the very
   end of the window and not yet done counts against you.
 
+### On-time by priority
+
+- **Measures:** of completed tasks that **had a due date**, the share finished
+  **on or before** that date (via `was_overdue`), per priority (compares P1 vs
+  P4). Answers "do you hit the *dates* on high-priority work?" — distinct from
+  speed (how long) and reliability (share done).
+- **Ignores:** completions with no due date (nothing to be on-time against).
+- **Source:** activity log (`completed` events: `was_overdue`, `priority`).
+- **Caveats:** needs ≥ 3 dated completions per priority; recurring completions
+  are included; the free plan's 7-day activity cap shrinks the sample.
+
 ---
 
 ## Are you executing well?
@@ -156,3 +167,13 @@ Data sources referenced below:
 - **Source:** activity log.
 - **Caveats:** only computed with **≥ 6** closes in the window; halves are by
   calendar time, so an uneven period can read as a trend.
+
+### Overdue now
+
+- **Measures:** currently-open tasks whose **due date is in the past**, listed
+  oldest-first with days overdue.
+- **Ignores / doesn't capture:** recurring tasks (their next occurrence isn't
+  "overdue"); respects the project/priority filters. Distinct from *stale open
+  tasks* (old + unscheduled) — an overdue task can be brand new.
+- **Source:** open-tasks snapshot (`dueDate`, `isRecurring`).
+- **Caveats:** a point-in-time snapshot; "now" is the window's end date.

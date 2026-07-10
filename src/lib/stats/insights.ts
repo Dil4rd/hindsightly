@@ -327,6 +327,26 @@ export function computeInsights(
         })),
       })
     }
+
+    // Open tasks already past their due date (distinct from stale = old + unscheduled).
+    const overdue = scopedOpen
+      .filter((t) => !t.isRecurring && t.dueDate != null && (toDay(t.dueDate) ?? '') < today)
+      .sort((a, b) => Date.parse(a.dueDate ?? '') - Date.parse(b.dueDate ?? ''))
+    if (overdue.length) {
+      out.push({
+        category: 'execution',
+        tone: 'warn',
+        docId: 'overdue-now',
+        title: `${overdue.length} task${overdue.length > 1 ? 's' : ''} overdue`,
+        detail: 'Open tasks past their due date — complete them or reschedule honestly.',
+        items: overdue.map((t) => ({
+          id: t.id,
+          label: t.content || undefined,
+          meta: `${Math.round((nowMs - Date.parse(t.dueDate ?? '')) / DAY)}d over`,
+          href: taskHref(t.id),
+        })),
+      })
+    }
   }
 
   // ---- Throughput trend (closed: recent half vs earlier half of the window) ----
@@ -425,6 +445,47 @@ export function computeInsights(
             title: `P1 reliability ${rel1}% < P4 ${rel4}%`,
             detail:
               'Of work due this period, you complete a smaller share at high priority than low — high-priority commitments may be slipping.',
+          },
+    )
+  }
+
+  // ---- On-time completion by priority (did you HIT the committed date?) ----
+  // Of completed dated tasks, the share finished by their due date, per priority.
+  const dueDoneTotal = new Map<number, number>()
+  const dueDoneOnTime = new Map<number, number>()
+  for (const e of evs) {
+    const x = e.extra_data ?? {}
+    if (classify(e).includes('closed') && x.completed_due_date) {
+      const p = x.priority ?? 1
+      dueDoneTotal.set(p, (dueDoneTotal.get(p) ?? 0) + 1)
+      if (x.was_overdue !== true) dueDoneOnTime.set(p, (dueDoneOnTime.get(p) ?? 0) + 1)
+    }
+  }
+  const MIN_ONTIME = 3
+  const onTime = (p: number): number | null => {
+    const tot = dueDoneTotal.get(p) ?? 0
+    return tot >= MIN_ONTIME ? Math.round((100 * (dueDoneOnTime.get(p) ?? 0)) / tot) : null
+  }
+  const ot1 = onTime(4) // P1
+  const ot4 = onTime(1) // P4
+  if (ot1 != null && ot4 != null) {
+    out.push(
+      ot1 >= ot4
+        ? {
+            category: 'prioritization',
+            tone: 'good',
+            docId: 'on-time-by-priority',
+            title: `P1 on-time ${ot1}% ≥ P4 ${ot4}%`,
+            detail:
+              'You hit due dates on high-priority work more often than low — priorities guide your scheduling.',
+          }
+        : {
+            category: 'prioritization',
+            tone: 'warn',
+            docId: 'on-time-by-priority',
+            title: `P1 on-time ${ot1}% < P4 ${ot4}%`,
+            detail:
+              'You hit due dates on high-priority work less often than low — high-priority dates may be slipping.',
           },
     )
   }
