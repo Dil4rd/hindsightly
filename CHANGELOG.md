@@ -8,6 +8,8 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-10
+
 ### Added
 
 - Deeper insights — stale open tasks, projects accumulating many stale tasks,
@@ -92,5 +94,6 @@ Initial release.
   GitHub workflow that builds and attaches the single-file artifact.
 - Logo + favicon.
 
-[Unreleased]: https://github.com/Dil4rd/hindsightly/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Dil4rd/hindsightly/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Dil4rd/hindsightly/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Dil4rd/hindsightly/releases/tag/v0.1.0
