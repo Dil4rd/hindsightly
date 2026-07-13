@@ -4,6 +4,7 @@
 
 import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../todoist/types'
 import { classify, countedBuckets, suppressedDueChanges, toDay } from './events'
+import { taskNameIndex } from './names'
 import { completedInScope, eventInScope, type Filters } from './filters'
 import { RESCHEDULE_DEDUP_MS } from '../config'
 
@@ -67,7 +68,6 @@ export function computeInsights(
   let reprioritized = 0
   const postponesByItem = new Map<string, number>()
   const activityByProject = new Map<string, number>()
-  const contentByItem = new Map<string, string>() // task title when present in events
 
   for (const e of evs) {
     const buckets = countedBuckets(e, suppress)
@@ -86,15 +86,9 @@ export function computeInsights(
     if (buckets.includes('postponed')) {
       postponesByItem.set(e.object_id, (postponesByItem.get(e.object_id) ?? 0) + 1)
     }
-    if (e.extra_data?.content) contentByItem.set(e.object_id, e.extra_data.content)
   }
 
-  // Best-known task title by id: event content, then completed items, then the
-  // current open-tasks snapshot (freshest — wins). In-memory only; empty after
-  // a reload until data refetches.
-  const nameById = new Map<string, string>(contentByItem)
-  for (const c of completed) if (c.content) nameById.set(c.id, c.content)
-  for (const t of openTasks) if (t.content) nameById.set(t.id, t.content)
+  const nameById = taskNameIndex(events, completed, openTasks)
   const recurringIds = new Set(openTasks.filter((t) => t.isRecurring).map((t) => t.id))
 
   // ---- Are you tracking the right tasks? ----

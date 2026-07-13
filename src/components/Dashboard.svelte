@@ -4,6 +4,7 @@
   import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../lib/todoist/types'
   import { presetWindow, type Filters, type TimePreset } from '../lib/stats/filters'
   import { computeMetrics, metricBreakdown } from '../lib/stats/metrics'
+  import { taskNameIndex } from '../lib/stats/names'
   import { METRIC_BUCKETS, type MetricBucket } from '../lib/stats/types'
   import { granularityFor, trendSeries } from '../lib/stats/series'
   import { computeInsights, type Insight } from '../lib/stats/insights'
@@ -198,16 +199,9 @@
       : 'All projects',
   )
   const breakdown = $derived(metricBreakdown(events, filters))
-  // Best-known task title by id: event content, then completed items, then the
-  // current open-tasks snapshot (freshest). In-memory only — after a reload the
-  // cache is name-free, so this repopulates from the session's live snapshots.
-  const nameById = $derived.by(() => {
-    const m = new Map<string, string>()
-    for (const e of events) if (e.extra_data?.content) m.set(e.object_id, e.extra_data.content)
-    for (const c of completed) if (c.content) m.set(c.id, c.content)
-    for (const t of openTasks) if (t.content) m.set(t.id, t.content)
-    return m
-  })
+  // Shared name resolver — the ONLY sanctioned way to turn a task id into a
+  // title (the cache is name-free; see taskNameIndex).
+  const nameById = $derived(taskNameIndex(events, completed, openTasks))
 
   // Display label + tooltip per metric; the title is reused in the drill-down drawer.
   const METRIC_META: Record<MetricBucket, { title: string; hint: string }> = {
