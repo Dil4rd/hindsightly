@@ -35,7 +35,7 @@
 
     {#if panel.items.length}
       <ul>
-        {#each panel.items as it (it.id)}
+        {#each panel.items as it, i (i)}
           <li>
             <a href={it.href} target="_blank" rel="noopener noreferrer">{it.label ?? 'Open task'}</a>
             {#if it.meta}<span class="meta">{it.meta}</span>{/if}
