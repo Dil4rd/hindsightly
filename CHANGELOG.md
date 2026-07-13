@@ -28,8 +28,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
   offenders (dead projects, serial postponers, stale tasks) with deep links into
   Todoist. Task titles are kept in memory only; the cache stores ids, not text.
 - Clickable metric cards — clicking a count (opened, closed, postponed, …; not
-  mean-time-to-complete) opens the same drawer listing the underlying tasks with
-  dates and Todoist deep links.
+  mean-time-to-complete) opens a drawer of the underlying tasks, deduped one row
+  per task with its frequency + date span (`3× · Jul 7–11`), most-frequent
+  first, with Todoist deep links.
 - Reschedule debounce — multiple due-date changes on the same task within a
   window count as one (typo-correction noise); window via
   `VITE_RESCHEDULE_DEDUP_MIN` (default 10 min).

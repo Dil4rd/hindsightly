@@ -220,17 +220,34 @@
   const NOTE = 'Opens in Todoist. Task titles show for this session only.'
   const fmtDay = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
   const taskHref = (id: string) => `https://app.todoist.com/app/task/${id}`
+  const fmtRange = (first: string, last: string) => {
+    const a = fmtDay.format(Date.parse(first))
+    const b = fmtDay.format(Date.parse(last))
+    return a === b ? a : `${a}–${b}`
+  }
 
   function openMetric(b: MetricBucket) {
+    // Dedupe to one row per task (a task can appear once per event); show its
+    // frequency + date span. Most-frequent first — the chronic offenders.
+    const byId = new Map<string, { count: number; first: string; last: string }>()
+    for (const it of breakdown[b]) {
+      const g = byId.get(it.objectId) ?? { count: 0, first: it.eventDate, last: it.eventDate }
+      g.count++
+      if (it.eventDate < g.first) g.first = it.eventDate
+      if (it.eventDate > g.last) g.last = it.eventDate
+      byId.set(it.objectId, g)
+    }
     selectedPanel = {
       title: METRIC_META[b].title,
       detail: METRIC_META[b].hint,
-      items: breakdown[b].map((it) => ({
-        id: it.objectId,
-        label: nameById.get(it.objectId) || it.content || undefined,
-        meta: fmtDay.format(Date.parse(it.eventDate)),
-        href: taskHref(it.objectId),
-      })),
+      items: [...byId.entries()]
+        .sort((a, z) => z[1].count - a[1].count)
+        .map(([id, g]) => ({
+          id,
+          label: nameById.get(id) || undefined,
+          meta: g.count > 1 ? `${g.count}× · ${fmtRange(g.first, g.last)}` : fmtDay.format(Date.parse(g.last)),
+          href: taskHref(id),
+        })),
       note: NOTE,
     }
   }
