@@ -41,6 +41,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 - Insights now lead the dashboard; the stat cards + trend chart moved into a
   collapsible "Metrics" section below (expanded by default).
+- Dropped the passkey-label field on first run — it's auto-labelled now (the
+  label is only the authenticator's display name), which also stops password
+  managers autofilling that text box.
 - Project filter moved from the left sidebar into a dropdown in the top filter
   row (its label shows the selected project + subproject count; opens/closes on
   click, closes on selection), reclaiming full width for the content. Selecting a
@@ -52,6 +55,9 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ### Fixed
 
+- Light theme now applies to text inputs (they were hardcoded dark, so the
+  first-run token field stayed black in light mode).
+- Trend-chart hover no longer shows a meaningless `00:00 UTC` for day buckets.
 - Per-priority completion reworked into a bounded reliability rate: of work
   *due* in the period, the share completed (credits earlier-created and recurring
   completions; tasks postponed out of the period still count as not done). Earlier

@@ -31,17 +31,11 @@
   // would show a misleading "1am").
   const fmtDate = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
   const fmtWeekday = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' })
-  const fmtTime = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'UTC',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
 
   const fmtHover = (ms: number) =>
     series.granularity === 'week'
       ? `Week of ${fmtDate.format(ms)}`
-      : `${fmtWeekday.format(ms)}, ${fmtDate.format(ms)} · ${fmtTime.format(ms)} UTC`
+      : `${fmtWeekday.format(ms)}, ${fmtDate.format(ms)}`
 
   const DAY_SEC = 86_400
   // Whole-day tick increments only (prevents uPlot from placing 2 sub-day ticks

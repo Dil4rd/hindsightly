@@ -30,7 +30,6 @@
 
   // first-run enrollment fields
   let tokenInput = $state('')
-  let label = $state('My passkey')
 
   $effect(() => {
     loadVault().then((v) => {
@@ -54,13 +53,11 @@
   const doEnroll = () =>
     run(async () => {
       const token = tokenInput.trim()
+      // Auto-labelled — it's just the passkey's display name in the authenticator.
+      const now = new Date().toISOString()
       // We already hold the plaintext token here — no second ceremony needed;
       // the unlock path is exercised on the next session.
-      const { vault: v, cacheKey } = await enroll(
-        token,
-        label.trim() || 'My passkey',
-        new Date().toISOString(),
-      )
+      const { vault: v, cacheKey } = await enroll(token, `Hindsightly (${now.slice(0, 10)})`, now)
       vault = v
       onUnlocked(token, cacheKey)
     })
@@ -103,10 +100,6 @@
     <label>
       API token
       <input type="password" bind:value={tokenInput} autocomplete="off" placeholder="Todoist API token" />
-    </label>
-    <label>
-      Passkey label
-      <input type="text" bind:value={label} />
     </label>
     <button onclick={doEnroll} disabled={busy || !tokenInput.trim()}>
       {busy ? 'Registering…' : 'Register passkey & save'}
