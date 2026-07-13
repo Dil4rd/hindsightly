@@ -93,7 +93,7 @@
     width: max-content;
     max-width: 15rem;
     padding: 0.5rem 0.6rem;
-    background: #0e0c0b;
+    background: var(--input-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 0.75rem;
