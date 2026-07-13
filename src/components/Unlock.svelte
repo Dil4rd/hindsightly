@@ -99,7 +99,19 @@
     </p>
     <label>
       API token
-      <input type="password" bind:value={tokenInput} autocomplete="off" placeholder="Todoist API token" />
+      <!-- Ask password managers to ignore this field: the token is encrypted by
+           the passkey on-device, we don't want a second plaintext copy in a
+           vault. autocomplete="off" alone is ignored by most managers. -->
+      <input
+        type="password"
+        bind:value={tokenInput}
+        autocomplete="off"
+        data-1p-ignore="true"
+        data-lpignore="true"
+        data-bwignore
+        data-form-type="other"
+        placeholder="Todoist API token"
+      />
     </label>
     <button onclick={doEnroll} disabled={busy || !tokenInput.trim()}>
       {busy ? 'Registering…' : 'Register passkey & save'}
