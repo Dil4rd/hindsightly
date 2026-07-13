@@ -198,6 +198,16 @@
       : 'All projects',
   )
   const breakdown = $derived(metricBreakdown(events, filters))
+  // Best-known task title by id: event content, then completed items, then the
+  // current open-tasks snapshot (freshest). In-memory only — after a reload the
+  // cache is name-free, so this repopulates from the session's live snapshots.
+  const nameById = $derived.by(() => {
+    const m = new Map<string, string>()
+    for (const e of events) if (e.extra_data?.content) m.set(e.object_id, e.extra_data.content)
+    for (const c of completed) if (c.content) m.set(c.id, c.content)
+    for (const t of openTasks) if (t.content) m.set(t.id, t.content)
+    return m
+  })
 
   // Display label + tooltip per metric; the title is reused in the drill-down drawer.
   const METRIC_META: Record<MetricBucket, { title: string; hint: string }> = {
@@ -223,7 +233,7 @@
       detail: METRIC_META[b].hint,
       items: breakdown[b].map((it) => ({
         id: it.objectId,
-        label: it.content || undefined,
+        label: nameById.get(it.objectId) || it.content || undefined,
         meta: fmtDay.format(Date.parse(it.eventDate)),
         href: taskHref(it.objectId),
       })),

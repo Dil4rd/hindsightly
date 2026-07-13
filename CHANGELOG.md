@@ -8,7 +8,7 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-07-10
+## [0.2.0] - 2026-07-13
 
 ### Added
 
