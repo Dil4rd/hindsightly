@@ -8,6 +8,21 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ## [Unreleased]
 
+### Added
+
+- Waiting-for aging insight — open tasks tagged as a GTD "waiting-for"
+  (delegated / blocked / awaiting a reply) that have been pending over 14 days,
+  listed oldest-first to chase or drop. Which labels count is configurable via
+  `VITE_WAITING_LABELS` (default `waiting, waiting-for, wf, blocked, delegated`);
+  the card stays dormant until a task carries a matching label. Labels are held
+  in memory only — never written to the encrypted cache.
+
+### Changed
+
+- Tasks tagged as a waiting-for are now excluded from the stale-open-tasks and
+  serial-postponer signals — a labelled waiting-for is parked on purpose, so
+  re-nudging it no longer reads as avoidance.
+
 ## [0.2.0] - 2026-07-13
 
 ### Added

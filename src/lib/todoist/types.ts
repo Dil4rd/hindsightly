@@ -60,6 +60,7 @@ export interface OpenTask {
   added_at: string
   dueDate: string | null // next due (YYYY-MM-DD or datetime); timeline only
   isRecurring: boolean
+  labels: string[] // GTD role tags (waiting/someday/…); in-memory only, cache-stripped
 }
 
 export interface Page<T> {

@@ -42,8 +42,9 @@ function open(
   priority = 1,
   dueDate: string | null = null,
   isRecurring = false,
+  labels: string[] = [],
 ): OpenTask {
-  return { id, content: '', project_id: 'P1', priority, added_at: added, dueDate, isRecurring }
+  return { id, content: '', project_id: 'P1', priority, added_at: added, dueDate, isRecurring, labels }
 }
 
 const filters: Filters = {
@@ -106,6 +107,7 @@ describe('computeInsights', () => {
       'push-vs-do',
       'throughput-trend',
       'overdue-now',
+      'waiting-for-aging',
     ])
     for (const i of insights) {
       expect(i.docId, i.title).toBeTruthy()
@@ -186,6 +188,38 @@ describe('computeInsights', () => {
     const ins = res.find((i) => /overdue/.test(i.title))
     expect(ins?.title).toMatch(/1 task overdue/)
     expect(ins?.items?.some((it) => it.id === 'o1')).toBe(true)
+  })
+
+  it('flags an aged waiting-for item and excludes it from stale', () => {
+    // Tagged @waiting, created ~59 days before window end → aged (>14d).
+    const opens = [open('w1', '2026-05-01T00:00:00Z', 1, null, false, ['waiting'])]
+    const res = computeInsights([], [], [proj('P1')], opens, filters)
+    const ins = res.find((i) => /waiting-for item.*to chase/.test(i.title))
+    expect(ins?.title).toMatch(/1 waiting-for item to chase/)
+    expect(ins?.items?.some((it) => it.id === 'w1')).toBe(true)
+    // The same task must NOT be double-counted as stale.
+    expect(res.some((i) => /older than 30 days/.test(i.title))).toBe(false)
+  })
+  it('reports a fresh waiting-for list when nothing has aged', () => {
+    const opens = [open('w2', '2026-06-25T00:00:00Z', 1, null, false, ['waiting'])]
+    const res = computeInsights([], [], [proj('P1')], opens, filters)
+    expect(res.some((i) => /Waiting-for list is fresh/.test(i.title))).toBe(true)
+  })
+  it('stays dormant with no waiting labels present', () => {
+    const opens = [open('n1', '2026-06-25T00:00:00Z')]
+    const res = computeInsights([], [], [proj('P1')], opens, filters)
+    expect(res.some((i) => /waiting-for/i.test(i.title))).toBe(false)
+  })
+  it('excludes a waiting-labelled task from serial postponers', () => {
+    const postpones = [
+      ev('updated', 'A', { last_due_date: '2026-06-01', due_date: '2026-06-10' }, 'P1', '2026-06-08T10:00:00Z'),
+      ev('updated', 'A', { last_due_date: '2026-06-01', due_date: '2026-06-11' }, 'P1', '2026-06-09T10:00:00Z'),
+      ev('updated', 'A', { last_due_date: '2026-06-01', due_date: '2026-06-12' }, 'P1', '2026-06-10T10:00:00Z'),
+    ]
+    const opens = [open('A', '2026-06-01T00:00:00Z', 1, null, false, ['waiting'])]
+    const res = computeInsights(postpones, [], [proj('P1')], opens, filters)
+    const ins = res.find((i) => /postponed 3\+/.test(i.title))
+    expect(ins?.items?.some((it) => it.id === 'A')).toBeFalsy()
   })
 
   it('flags projects accumulating many stale tasks', () => {

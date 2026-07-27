@@ -6,7 +6,7 @@ import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../todoist
 import { classify, countedBuckets, suppressedDueChanges, toDay } from './events'
 import { taskNameIndex } from './names'
 import { completedInScope, eventInScope, type Filters } from './filters'
-import { RESCHEDULE_DEDUP_MS } from '../config'
+import { RESCHEDULE_DEDUP_MS, WAITING_LABELS } from '../config'
 
 export type InsightTone = 'good' | 'warn' | 'info'
 export type InsightCategory = 'right-tasks' | 'structure' | 'prioritization' | 'execution'
@@ -90,10 +90,20 @@ export function computeInsights(
 
   const nameById = taskNameIndex(events, completed, openTasks)
   const recurringIds = new Set(openTasks.filter((t) => t.isRecurring).map((t) => t.id))
+  // Tasks the user tagged as a GTD "waiting-for" (delegated/blocked). These are
+  // parked on purpose, so they're excused from the stale / serial-postponer
+  // signals and instead get their own aging insight below.
+  const waitingIds = new Set(
+    openTasks
+      .filter((t) => (t.labels ?? []).some((l) => WAITING_LABELS.has(l.toLowerCase())))
+      .map((t) => t.id),
+  )
 
   // ---- Are you tracking the right tasks? ----
   if (postponed > 0) {
-    const serial = [...postponesByItem.entries()].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1])
+    const serial = [...postponesByItem.entries()]
+      .filter(([id, n]) => n >= 3 && !waitingIds.has(id))
+      .sort((a, b) => b[1] - a[1])
     out.push(
       serial.length > 0
         ? {
@@ -272,7 +282,11 @@ export function computeInsights(
     const today = toDay(new Date(nowMs).toISOString()) ?? ''
     const futureScheduled = (t: OpenTask) => t.dueDate != null && (toDay(t.dueDate) ?? '') >= today
     const stale = scopedOpen.filter(
-      (t) => !t.isRecurring && !futureScheduled(t) && nowMs - Date.parse(t.added_at) > STALE_MS,
+      (t) =>
+        !t.isRecurring &&
+        !futureScheduled(t) &&
+        !waitingIds.has(t.id) &&
+        nowMs - Date.parse(t.added_at) > STALE_MS,
     )
     if (stale.length) {
       const byAge = [...stale].sort((a, b) => Date.parse(a.added_at) - Date.parse(b.added_at))
@@ -340,6 +354,40 @@ export function computeInsights(
           href: taskHref(t.id),
         })),
       })
+    }
+
+    // Waiting-for aging — items you've delegated/blocked (by label) and are
+    // waiting on. Old ones need a nudge or a drop. Dormant unless labels match.
+    const WAITING_STALE_MS = 14 * DAY
+    const waiting = scopedOpen.filter((t) => waitingIds.has(t.id))
+    if (waiting.length) {
+      const aged = waiting
+        .filter((t) => nowMs - Date.parse(t.added_at) > WAITING_STALE_MS)
+        .sort((a, b) => Date.parse(a.added_at) - Date.parse(b.added_at))
+      if (aged.length) {
+        const oldest = nowMs - Date.parse(aged[0].added_at)
+        out.push({
+          category: 'right-tasks',
+          tone: 'warn',
+          docId: 'waiting-for-aging',
+          title: `${aged.length} waiting-for item${aged.length > 1 ? 's' : ''} to chase`,
+          detail: `Delegated or blocked tasks pending over 14 days (oldest: ${Math.round(oldest / DAY)} days) — nudge them or drop them.`,
+          items: aged.map((t) => ({
+            id: t.id,
+            label: t.content || undefined,
+            meta: `${Math.round((nowMs - Date.parse(t.added_at)) / DAY)}d`,
+            href: taskHref(t.id),
+          })),
+        })
+      } else {
+        out.push({
+          category: 'right-tasks',
+          tone: 'good',
+          docId: 'waiting-for-aging',
+          title: 'Waiting-for list is fresh',
+          detail: 'Nothing you’re waiting on has been pending over 14 days.',
+        })
+      }
     }
   }
 

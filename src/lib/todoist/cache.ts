@@ -55,7 +55,9 @@ export function stripEvent(e: ActivityEvent): ActivityEvent {
 }
 
 export function stripOpenTask(t: OpenTask): OpenTask {
-  // Keep ids + timelines (dueDate/isRecurring); drop only the task title.
+  // Keep ids + timelines (dueDate/isRecurring); drop the task title AND labels.
+  // Labels are user-defined strings that can be sensitive; the open-task snapshot
+  // is re-fetched live every session, so labels never need to persist at rest.
   return {
     id: t.id,
     content: '',
@@ -64,6 +66,7 @@ export function stripOpenTask(t: OpenTask): OpenTask {
     added_at: t.added_at,
     dueDate: t.dueDate,
     isRecurring: t.isRecurring,
+    labels: [],
   }
 }
 

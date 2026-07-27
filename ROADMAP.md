@@ -28,11 +28,12 @@ probe-confirmed (2026-07): the "confirmed" ones only need build work.
 
 ## Later
 
-- [ ] **Waiting-for / someday, via a label-role layer** — a small settings step
-      mapping the user's labels to GTD roles (waiting / someday / context),
-      stored locally; unlocks waiting-for aging (delegated things needing a
-      nudge) and someday-pile review. *Confirmed* `labels[]`; opt-in (no value
-      without config). The most GTD-native addition available.
+- [ ] **Label-role layer: someday / context (+ runtime settings)** —
+      *waiting-for aging shipped* (label set via `VITE_WAITING_LABELS`). What's
+      left: model the other GTD roles — **someday** (a review of the parked pile)
+      and **context** — and replace the build-time env with a small in-app
+      settings step that maps labels → roles, stored locally. Opt-in; the most
+      GTD-native surface still open. *Confirmed* `labels[]`.
 - [ ] **Tasks that are really projects** — open tasks with many open subtasks (or
       deep nesting) = an undecomposed project. *Confirmed* `parent_id`.
 - [ ] **Deadline vs due discipline** — flag hard `deadline`s with no plan-date

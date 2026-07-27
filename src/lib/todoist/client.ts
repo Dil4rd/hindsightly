@@ -15,6 +15,7 @@ interface RawTask {
   priority: number
   added_at: string
   due: { date?: string; is_recurring?: boolean } | null
+  labels?: string[]
 }
 
 export class TodoistClient {
@@ -73,6 +74,7 @@ export class TodoistClient {
       added_at: r.added_at,
       dueDate: r.due?.date ?? null,
       isRecurring: !!r.due?.is_recurring,
+      labels: r.labels ?? [],
     }))
   }
 

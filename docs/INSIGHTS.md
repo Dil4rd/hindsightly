@@ -20,7 +20,8 @@ Data sources referenced below:
 - **Completed items** — `GET /api/v1/tasks/completed/by_completion_date` (has
   `added_at` + `completed_at`; **excludes recurring** completions).
 - **Open-tasks snapshot** — `GET /api/v1/tasks` (current open tasks with
-  `dueDate`, `isRecurring`).
+  `dueDate`, `isRecurring`, `labels`). Labels stay in memory only — they're never
+  written to the encrypted cache (re-fetched live each session).
 
 ---
 
@@ -36,7 +37,8 @@ Data sources referenced below:
   window (default **10 min**, `VITE_RESCHEDULE_DEDUP_MIN`) collapse to one — typo
   corrections don't inflate the count. Recurrence **auto-advances are not
   postpones** (they live in the completed event), so routine recurring behaviour
-  is excluded; only *manual* pushes count.
+  is excluded; only *manual* pushes count. Tasks tagged as a **waiting-for**
+  (see below) are also excluded — re-nudging a delegated item isn't avoidance.
 - **Source:** activity log.
 - **Caveats:** window-bounded (only postpones whose event date is in the period);
   the "3+" threshold is fixed.
@@ -54,11 +56,29 @@ Data sources referenced below:
 
 - **Measures:** currently-open tasks created **> 30 days** before the window end
   that are **not actively scheduled**. Lists them with age.
-- **Ignores / doesn't capture:** **recurring** tasks (living routines) and tasks
-  with a **future due date** (planned, not stuck) are excluded. Overdue and
-  undated old tasks are included.
+- **Ignores / doesn't capture:** **recurring** tasks (living routines), tasks
+  with a **future due date** (planned, not stuck), and **waiting-for** tasks (see
+  below — parked on purpose) are excluded. Overdue and undated old tasks are
+  included.
 - **Source:** open-tasks snapshot (`added_at`, `dueDate`, `isRecurring`).
 - **Caveats:** "now" = the window's end date; the 30-day threshold is fixed.
+
+### Waiting-for aging
+
+- **Measures:** open tasks you've tagged as a GTD **waiting-for** (delegated /
+  blocked / awaiting a reply) that have been **pending over 14 days**, listed
+  oldest-first with age — the "chase them or drop them" list. If you have
+  waiting-for tasks but none has aged, shows "Waiting-for list is fresh".
+- **Which labels count:** any label in `VITE_WAITING_LABELS` (comma-separated,
+  case-insensitive; default `waiting, waiting-for, wf, blocked, delegated`). The
+  card is **dormant** until a task carries one — no config, no card.
+- **Ignores / doesn't capture:** age is measured from task **creation**
+  (`added_at`), not from when it entered the waiting state (Todoist exposes no
+  "labelled-at"). Respects the project/priority filters.
+- **Source:** open-tasks snapshot (`labels`, `added_at`). Labels live in memory
+  only — never persisted to the cache.
+- **Caveats:** "now" = the window's end date; the 14-day threshold is fixed;
+  someday/context label roles aren't modelled yet (roadmap).
 
 ---
 

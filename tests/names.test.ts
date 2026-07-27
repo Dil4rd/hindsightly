@@ -29,6 +29,7 @@ const open = (id: string, content: string): OpenTask => ({
   added_at: '2026-06-01',
   dueDate: null,
   isRecurring: false,
+  labels: [],
 })
 
 describe('taskNameIndex', () => {
