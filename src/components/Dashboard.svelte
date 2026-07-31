@@ -20,7 +20,6 @@
     stripOpenTask,
   } from '../lib/todoist/cache'
   import { loadSettings, saveSettings } from '../lib/todoist/settings'
-  import { DEFAULT_WAITING_LABELS } from '../lib/config'
   import StatCard from './StatCard.svelte'
   import ProjectTree from './ProjectTree.svelte'
   import LabelPicker from './LabelPicker.svelte'
@@ -73,7 +72,6 @@
   let hydrated = false
   let toppedUp = false
   let snapshotFetched = false
-  let hadSavedSettings = false // did the user already pick waiting-for labels?
 
   // Re-runs only on preset change; untrack() keeps sync()'s state reads from
   // becoming dependencies (which would loop).
@@ -124,10 +122,7 @@
         }
         // User settings (waiting-for label ids) — encrypted, per account.
         const st = await loadSettings(account, cacheKey)
-        if (st) {
-          waitingLabelIds = st.waitingLabelIds
-          hadSavedSettings = true
-        }
+        if (st) waitingLabelIds = st.waitingLabelIds
       }
 
       // 2) Refresh current snapshots (projects, open tasks, labels, plan) once per session.
@@ -143,13 +138,6 @@
         openTasks = ot
         isPremium = premium
         labels = lb
-        // First run only: seed the waiting-for selection from the built-in
-        // default names. After that the saved selection wins.
-        if (!hadSavedSettings && waitingLabelIds.length === 0) {
-          waitingLabelIds = lb
-            .filter((l) => DEFAULT_WAITING_LABELS.has(l.name.toLowerCase()))
-            .map((l) => l.id)
-        }
       }
 
       // 3) Top-up activity newer than what we have (once per session).

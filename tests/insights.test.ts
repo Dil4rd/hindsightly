@@ -190,10 +190,11 @@ describe('computeInsights', () => {
     expect(ins?.items?.some((it) => it.id === 'o1')).toBe(true)
   })
 
+  const WAITING = new Set(['waiting'])
   it('flags an aged waiting-for item and excludes it from stale', () => {
     // Tagged @waiting, created ~59 days before window end → aged (>14d).
     const opens = [open('w1', '2026-05-01T00:00:00Z', 1, null, false, ['waiting'])]
-    const res = computeInsights([], [], [proj('P1')], opens, filters)
+    const res = computeInsights([], [], [proj('P1')], opens, filters, undefined, WAITING)
     const ins = res.find((i) => /waiting-for item.*to chase/.test(i.title))
     expect(ins?.title).toMatch(/1 waiting-for item to chase/)
     expect(ins?.items?.some((it) => it.id === 'w1')).toBe(true)
@@ -202,13 +203,16 @@ describe('computeInsights', () => {
   })
   it('reports a fresh waiting-for list when nothing has aged', () => {
     const opens = [open('w2', '2026-06-25T00:00:00Z', 1, null, false, ['waiting'])]
-    const res = computeInsights([], [], [proj('P1')], opens, filters)
+    const res = computeInsights([], [], [proj('P1')], opens, filters, undefined, WAITING)
     expect(res.some((i) => /Waiting-for list is fresh/.test(i.title))).toBe(true)
   })
-  it('stays dormant with no waiting labels present', () => {
-    const opens = [open('n1', '2026-06-25T00:00:00Z')]
+  it('is off by default (no waiting labels selected → no card)', () => {
+    // Same @waiting-tagged task, but no set passed → dormant, and it falls
+    // back to being a normal stale task.
+    const opens = [open('w1', '2026-05-01T00:00:00Z', 1, null, false, ['waiting'])]
     const res = computeInsights([], [], [proj('P1')], opens, filters)
     expect(res.some((i) => /waiting-for/i.test(i.title))).toBe(false)
+    expect(res.some((i) => /older than 30 days/.test(i.title))).toBe(true)
   })
   it('excludes a waiting-labelled task from serial postponers', () => {
     const postpones = [
@@ -217,7 +221,7 @@ describe('computeInsights', () => {
       ev('updated', 'A', { last_due_date: '2026-06-01', due_date: '2026-06-12' }, 'P1', '2026-06-10T10:00:00Z'),
     ]
     const opens = [open('A', '2026-06-01T00:00:00Z', 1, null, false, ['waiting'])]
-    const res = computeInsights(postpones, [], [proj('P1')], opens, filters)
+    const res = computeInsights(postpones, [], [proj('P1')], opens, filters, undefined, WAITING)
     const ins = res.find((i) => /postponed 3\+/.test(i.title))
     expect(ins?.items?.some((it) => it.id === 'A')).toBeFalsy()
   })
