@@ -20,7 +20,7 @@
     stripOpenTask,
   } from '../lib/todoist/cache'
   import { loadSettings, saveSettings } from '../lib/todoist/settings'
-  import { WAITING_LABELS } from '../lib/config'
+  import { DEFAULT_WAITING_LABELS } from '../lib/config'
   import StatCard from './StatCard.svelte'
   import ProjectTree from './ProjectTree.svelte'
   import LabelPicker from './LabelPicker.svelte'
@@ -143,10 +143,12 @@
         openTasks = ot
         isPremium = premium
         labels = lb
-        // First run only: seed the waiting-for selection from the env default
-        // names (VITE_WAITING_LABELS). After that the saved selection wins.
+        // First run only: seed the waiting-for selection from the built-in
+        // default names. After that the saved selection wins.
         if (!hadSavedSettings && waitingLabelIds.length === 0) {
-          waitingLabelIds = lb.filter((l) => WAITING_LABELS.has(l.name.toLowerCase())).map((l) => l.id)
+          waitingLabelIds = lb
+            .filter((l) => DEFAULT_WAITING_LABELS.has(l.name.toLowerCase()))
+            .map((l) => l.id)
         }
       }
 

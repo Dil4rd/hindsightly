@@ -10,26 +10,18 @@ const mins = Number(import.meta.env.VITE_RESCHEDULE_DEDUP_MIN)
 export const RESCHEDULE_DEDUP_MS = (Number.isFinite(mins) ? mins : 10) * 60_000
 
 /**
- * Default seed for the GTD "waiting-for" role — delegated, blocked, or awaiting
- * someone else's reply. Comma-separated, case-insensitive; override the seed at
- * build with e.g. `VITE_WAITING_LABELS=waiting,blocked,delegated`.
- *
- * This is only the FIRST-RUN default: on first load any of the account's labels
- * whose name matches is pre-selected in the in-app picker. After that the user's
- * saved selection (label ids, encrypted per account) is the source of truth.
- * Drives the waiting-for-aging insight and excuses those tasks from the stale /
- * serial-postponer signals. With nothing selected it stays dormant: no card.
+ * Built-in default names for the GTD "waiting-for" role — delegated, blocked, or
+ * awaiting someone else's reply. Used ONLY to pre-select matching labels on first
+ * run; after that the user's in-app selection (label ids, encrypted per account)
+ * is the source of truth. Lowercased for case-insensitive matching.
  */
-const rawWaiting = import.meta.env.VITE_WAITING_LABELS
-export const WAITING_LABELS = new Set(
-  (typeof rawWaiting === 'string' && rawWaiting.trim()
-    ? rawWaiting
-    : 'waiting,waiting-for,wf,blocked,delegated'
-  )
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean),
-)
+export const DEFAULT_WAITING_LABELS = new Set([
+  'waiting',
+  'waiting-for',
+  'wf',
+  'blocked',
+  'delegated',
+])
 
 /** Canonical methodology doc; each insight deep-links to its `#docId` anchor. */
 export const INSIGHTS_DOC_URL =

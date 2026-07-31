@@ -19,8 +19,8 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
   labels mean "waiting-for" (multi-select of your account's labels), so there's
   no env var to set or page to rebuild. The choice is stored encrypted per
   account (a new IndexedDB `settings` store, AES-GCM under the passkey-derived
-  key; only opaque label ids at rest). `VITE_WAITING_LABELS` now just seeds the
-  default selection on first run.
+  key; only opaque label ids at rest). On first run, labels named like `waiting`
+  / `blocked` / `delegated` are pre-selected as a starting point.
 
 ### Changed
 

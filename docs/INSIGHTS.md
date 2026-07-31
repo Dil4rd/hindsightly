@@ -71,10 +71,10 @@ Data sources referenced below:
   waiting-for tasks but none has aged, shows "Waiting-for list is fresh".
 - **Which labels count:** the labels you pick in the **Waiting-for** control in
   the top bar (multi-select of your account's labels). Your choice is stored
-  encrypted per account (label ids only, never names). On first run it's seeded
-  from `VITE_WAITING_LABELS` (default `waiting, waiting-for, wf, blocked,
-  delegated`). The card is **dormant** until at least one label is selected and
-  a task carries it — no picks, no card.
+  encrypted per account (label ids only, never names). On first run, any labels
+  named like `waiting`, `waiting-for`, `wf`, `blocked`, or `delegated` are
+  pre-selected; you can change the picks anytime. The card is **dormant** until
+  at least one label is selected and a task carries it — no picks, no card.
 - **Ignores / doesn't capture:** age is measured from task **creation**
   (`added_at`), not from when it entered the waiting state (Todoist exposes no
   "labelled-at"). Respects the project/priority filters.

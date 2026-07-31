@@ -6,7 +6,7 @@ import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../todoist
 import { classify, countedBuckets, suppressedDueChanges, toDay } from './events'
 import { taskNameIndex } from './names'
 import { completedInScope, eventInScope, type Filters } from './filters'
-import { RESCHEDULE_DEDUP_MS, WAITING_LABELS } from '../config'
+import { RESCHEDULE_DEDUP_MS, DEFAULT_WAITING_LABELS } from '../config'
 
 export type InsightTone = 'good' | 'warn' | 'info'
 export type InsightCategory = 'right-tasks' | 'structure' | 'prioritization' | 'execution'
@@ -56,7 +56,7 @@ export function computeInsights(
   openTasks: OpenTask[],
   filters: Filters,
   dedupMs: number = RESCHEDULE_DEDUP_MS,
-  waitingLabels: Set<string> = WAITING_LABELS, // lowercased label names → waiting-for role
+  waitingLabels: Set<string> = DEFAULT_WAITING_LABELS, // lowercased label names → waiting-for role
 ): Insight[] {
   const evs = events.filter((e) => eventInScope(e, filters))
   const done = completed.filter((c) => completedInScope(c, filters))
