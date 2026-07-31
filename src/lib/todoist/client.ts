@@ -3,7 +3,7 @@
 // header is not a CORS "credential", so `credentials: 'omit'` makes direct
 // browser calls work.
 
-import type { ActivityEvent, CompletedItem, OpenTask, Page, Project } from './types'
+import type { ActivityEvent, CompletedItem, Label, OpenTask, Page, Project } from './types'
 
 const BASE = 'https://api.todoist.com'
 
@@ -61,6 +61,11 @@ export class TodoistClient {
 
   listProjects(): Promise<Project[]> {
     return this.paginate<Project>('/api/v1/projects', { limit: 200 }, (p) => p.results ?? [])
+  }
+
+  /** The account's personal labels (id + name) — for the waiting-for picker. */
+  listLabels(): Promise<Label[]> {
+    return this.paginate<Label>('/api/v1/labels', { limit: 200 }, (p) => p.results ?? [])
   }
 
   /** Current active (open) tasks — a snapshot, not windowed. */

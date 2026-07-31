@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { TodoistClient } from '../lib/todoist/client'
-  import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../lib/todoist/types'
+  import type { ActivityEvent, CompletedItem, Label, OpenTask, Project } from '../lib/todoist/types'
   import { presetWindow, type Filters, type TimePreset } from '../lib/stats/filters'
   import { computeMetrics, metricBreakdown } from '../lib/stats/metrics'
   import { taskNameIndex } from '../lib/stats/names'
@@ -19,8 +19,11 @@
     stripEvent,
     stripOpenTask,
   } from '../lib/todoist/cache'
+  import { loadSettings, saveSettings } from '../lib/todoist/settings'
+  import { WAITING_LABELS } from '../lib/config'
   import StatCard from './StatCard.svelte'
   import ProjectTree from './ProjectTree.svelte'
+  import LabelPicker from './LabelPicker.svelte'
   import TrendChart from './TrendChart.svelte'
   import InsightList from './InsightList.svelte'
   import DetailDrawer from './DetailDrawer.svelte'
@@ -50,12 +53,15 @@
   let selectedProjectId = $state<string | null>(null)
   let selectedPanel = $state<DrawerPanel | null>(null)
   let projOpen = $state(false)
+  let labelsOpen = $state(false)
 
   // data
   let projects = $state<Project[]>([])
   let events = $state<ActivityEvent[]>([])
   let completed = $state<CompletedItem[]>([])
   let openTasks = $state<OpenTask[]>([])
+  let labels = $state<Label[]>([]) // account's labels, for the waiting-for picker
+  let waitingLabelIds = $state<string[]>([]) // labels the user maps to "waiting-for"
   let isPremium = $state(true) // assume Pro until detected (avoids flashing disabled)
   let loading = $state(true)
   let error = $state<string | null>(null)
@@ -67,6 +73,7 @@
   let hydrated = false
   let toppedUp = false
   let snapshotFetched = false
+  let hadSavedSettings = false // did the user already pick waiting-for labels?
 
   // Re-runs only on preset change; untrack() keeps sync()'s state reads from
   // becoming dependencies (which would loop).
@@ -115,19 +122,32 @@
           isPremium = c.isPremium ?? true
           fetchedSince = c.fetchedSince
         }
+        // User settings (waiting-for label ids) — encrypted, per account.
+        const st = await loadSettings(account, cacheKey)
+        if (st) {
+          waitingLabelIds = st.waitingLabelIds
+          hadSavedSettings = true
+        }
       }
 
-      // 2) Refresh current snapshots (projects, open tasks, plan) once per session.
+      // 2) Refresh current snapshots (projects, open tasks, labels, plan) once per session.
       if (!snapshotFetched) {
         snapshotFetched = true
-        const [pj, ot, premium] = await Promise.all([
+        const [pj, ot, premium, lb] = await Promise.all([
           client.listProjects(),
           client.listOpenTasks(),
           client.isPremium(),
+          client.listLabels(),
         ])
         projects = pj
         openTasks = ot
         isPremium = premium
+        labels = lb
+        // First run only: seed the waiting-for selection from the env default
+        // names (VITE_WAITING_LABELS). After that the saved selection wins.
+        if (!hadSavedSettings && waitingLabelIds.length === 0) {
+          waitingLabelIds = lb.filter((l) => WAITING_LABELS.has(l.name.toLowerCase())).map((l) => l.id)
+        }
       }
 
       // 3) Top-up activity newer than what we have (once per session).
@@ -186,7 +206,21 @@
   const hasData = $derived(
     Object.values(metrics.counts).some((n) => n > 0) || metrics.meanTimeToCompleteMs != null,
   )
-  const insights = $derived(computeInsights(events, completed, projects, openTasks, filters))
+  // Resolve the picked label IDS → current lowercased names (task.labels are
+  // names, not ids). Done live so a rename doesn't strand the selection.
+  const labelsById = $derived(new Map(labels.map((l) => [l.id, l.name])))
+  const selectedLabelSet = $derived(new Set(waitingLabelIds))
+  const waitingLabelNames = $derived(
+    new Set(
+      waitingLabelIds
+        .map((id) => labelsById.get(id))
+        .filter((n): n is string => !!n)
+        .map((n) => n.toLowerCase()),
+    ),
+  )
+  const insights = $derived(
+    computeInsights(events, completed, projects, openTasks, filters, undefined, waitingLabelNames),
+  )
   const selectedProject = $derived(
     selectedProjectId ? (projects.find((p) => p.id === selectedProjectId) ?? null) : null,
   )
@@ -252,6 +286,22 @@
     }
   }
 
+  function toggleWaiting(id: string) {
+    waitingLabelIds = waitingLabelIds.includes(id)
+      ? waitingLabelIds.filter((x) => x !== id)
+      : [...waitingLabelIds, id]
+    void persistSettings()
+  }
+
+  async function persistSettings() {
+    if (!account) return
+    try {
+      await saveSettings(account, cacheKey, { waitingLabelIds: [...waitingLabelIds] })
+    } catch {
+      /* settings are best-effort */
+    }
+  }
+
   function openInsight(i: Insight) {
     selectedPanel = {
       title: i.title,
@@ -280,7 +330,10 @@
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === 'Escape') projOpen = false
+    if (e.key === 'Escape') {
+      projOpen = false
+      labelsOpen = false
+    }
   }}
 />
 
@@ -323,7 +376,10 @@
         class:active={selectedProjectId !== null}
         aria-haspopup="true"
         aria-expanded={projOpen}
-        onclick={() => (projOpen = !projOpen)}
+        onclick={() => {
+          projOpen = !projOpen
+          labelsOpen = false
+        }}
       >
         <span class="proj-label">{projLabel}</span><span class="caret">▾</span>
       </button>
@@ -338,6 +394,30 @@
               projOpen = false
             }}
           />
+        </div>
+      {/if}
+    </div>
+
+    <div class="proj-picker">
+      <button
+        class="proj-btn"
+        class:active={waitingLabelIds.length > 0}
+        aria-haspopup="true"
+        aria-expanded={labelsOpen}
+        title="Pick which labels mark a task as a GTD 'waiting-for'"
+        onclick={() => {
+          labelsOpen = !labelsOpen
+          projOpen = false
+        }}
+      >
+        <span class="proj-label"
+          >Waiting-for: {waitingLabelIds.length > 0 ? waitingLabelIds.length : 'off'}</span
+        ><span class="caret">▾</span>
+      </button>
+      {#if labelsOpen}
+        <div class="proj-overlay" role="presentation" onclick={() => (labelsOpen = false)}></div>
+        <div class="proj-pop">
+          <LabelPicker {labels} selected={selectedLabelSet} onToggle={toggleWaiting} />
         </div>
       {/if}
     </div>

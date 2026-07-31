@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { accountKey, mergeById, stripCompleted, stripEvent } from '../src/lib/todoist/cache'
-import type { ActivityEvent, CompletedItem } from '../src/lib/todoist/types'
+import { accountKey, mergeById, stripCompleted, stripEvent, stripOpenTask } from '../src/lib/todoist/cache'
+import type { ActivityEvent, CompletedItem, OpenTask } from '../src/lib/todoist/types'
 
 describe('mergeById', () => {
   it('dedupes by id, incoming wins', () => {
@@ -53,6 +53,25 @@ describe('strip', () => {
     expect(s.content).toBe('')
     expect(s.project_id).toBe('P')
     expect(s.completed_at).toBe('2026-06-03T00:00:00Z')
+  })
+
+  it('drops title AND labels from open tasks but keeps timelines', () => {
+    const t: OpenTask = {
+      id: 'o',
+      content: 'secret',
+      project_id: 'P',
+      priority: 3,
+      added_at: '2026-06-01T00:00:00Z',
+      dueDate: '2026-06-20',
+      isRecurring: true,
+      labels: ['waiting', 'sensitive-label'],
+    }
+    const s = stripOpenTask(t)
+    expect(s.content).toBe('')
+    expect(s.labels).toEqual([]) // labels are user strings — never persisted
+    expect(s.dueDate).toBe('2026-06-20')
+    expect(s.isRecurring).toBe(true)
+    expect(s.priority).toBe(3)
   })
 })
 

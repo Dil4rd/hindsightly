@@ -56,6 +56,7 @@ export function computeInsights(
   openTasks: OpenTask[],
   filters: Filters,
   dedupMs: number = RESCHEDULE_DEDUP_MS,
+  waitingLabels: Set<string> = WAITING_LABELS, // lowercased label names → waiting-for role
 ): Insight[] {
   const evs = events.filter((e) => eventInScope(e, filters))
   const done = completed.filter((c) => completedInScope(c, filters))
@@ -95,7 +96,7 @@ export function computeInsights(
   // signals and instead get their own aging insight below.
   const waitingIds = new Set(
     openTasks
-      .filter((t) => (t.labels ?? []).some((l) => WAITING_LABELS.has(l.toLowerCase())))
+      .filter((t) => (t.labels ?? []).some((l) => waitingLabels.has(l.toLowerCase())))
       .map((t) => t.id),
   )
 

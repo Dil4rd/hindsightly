@@ -12,10 +12,15 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 - Waiting-for aging insight — open tasks tagged as a GTD "waiting-for"
   (delegated / blocked / awaiting a reply) that have been pending over 14 days,
-  listed oldest-first to chase or drop. Which labels count is configurable via
-  `VITE_WAITING_LABELS` (default `waiting, waiting-for, wf, blocked, delegated`);
-  the card stays dormant until a task carries a matching label. Labels are held
-  in memory only — never written to the encrypted cache.
+  listed oldest-first to chase or drop. The card stays dormant until a task
+  carries a selected label. Labels are held in memory only — never written to
+  the encrypted cache.
+- Waiting-for label picker — a top-bar control to choose which of your Todoist
+  labels mean "waiting-for" (multi-select of your account's labels), so there's
+  no env var to set or page to rebuild. The choice is stored encrypted per
+  account (a new IndexedDB `settings` store, AES-GCM under the passkey-derived
+  key; only opaque label ids at rest). `VITE_WAITING_LABELS` now just seeds the
+  default selection on first run.
 
 ### Changed
 

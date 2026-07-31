@@ -63,6 +63,11 @@ export interface OpenTask {
   labels: string[] // GTD role tags (waiting/someday/…); in-memory only, cache-stripped
 }
 
+export interface Label {
+  id: string
+  name: string
+}
+
 export interface Page<T> {
   results?: T[]
   items?: T[]
