@@ -28,6 +28,19 @@ probe-confirmed (2026-07): the "confirmed" ones only need build work.
 
 ## Later
 
+- [ ] **Goal-alignment lens (5th retro question: "Are you moving toward your
+      goals?")** — close the GTD Horizons gap between 1y/5y goals and daily
+      tasks. Needs a **goal-mapping layer** (goal → top-level project(s), plus
+      optional goal → label for cross-cutting work), stored encrypted per
+      account — a direct generalization of the waiting-for label-picker pattern.
+      Then, on the existing **quarter** window, report: **coverage** (mapped vs
+      "orphan" effort — orphan share rising = drift) and **goal balance/drift**
+      (effort share per goal, quarter-over-quarter; flag a starving goal, e.g.
+      "Goal X: 2% this quarter, down from 15%"). *Confirmed* — reuses project
+      tree, `labels[]`, and per-project/label counts we already compute.
+      Deliberate boundary: measures **effort**, not **outcomes** — it flags a
+      neglected goal, not an ineffective one; the goal statements still need a
+      human review. Explored 2026-08 (design agreed, build deferred).
 - [ ] **Label-role layer: someday / context** — *waiting-for aging shipped, with
       a runtime label picker* (choose your waiting labels in-app; stored encrypted
       per account). What's left: model the other GTD roles — **someday** (a review
