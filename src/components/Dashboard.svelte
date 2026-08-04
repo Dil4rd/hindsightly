@@ -302,7 +302,9 @@
     }
   }
 
-  const PRESETS: TimePreset[] = ['week', 'month', 'quarter', 'year']
+  const PRESETS: TimePreset[] = ['day', 'week', 'month', 'quarter', 'year']
+  // Free accounts keep ~7 days of activity — day and week both fit.
+  const FREE_PRESETS = new Set<TimePreset>(['day', 'week'])
   const PRIORITIES: { label: string; value: number | null }[] = [
     { label: 'All', value: null },
     { label: 'P1', value: 4 },
@@ -344,8 +346,8 @@
       {#each PRESETS as p (p)}
         <button
           class:active={preset === p}
-          disabled={!isPremium && p !== 'week'}
-          title={!isPremium && p !== 'week'
+          disabled={!isPremium && !FREE_PRESETS.has(p)}
+          title={!isPremium && !FREE_PRESETS.has(p)
             ? 'Requires Todoist Pro — free accounts keep only 7 days of activity'
             : ''}
           onclick={() => (preset = p)}
@@ -420,7 +422,7 @@
   <p class="status" aria-live="polite">
     {#if loading}
       <span class="spinner" aria-hidden="true"></span>
-      Loading &amp; analyzing the last {preset}…
+      Loading &amp; analyzing {preset === 'day' ? 'today' : `the last ${preset}`}…
     {:else}
       {events.length.toLocaleString()} events · {completed.length.toLocaleString()} completed ·
       {projects.length} projects
@@ -457,14 +459,17 @@
           />
         </section>
 
-        <section class="chart-wrap">
-          <h2>Opened vs. closed per {granularity === 'week' ? 'week' : 'day'}</h2>
-          {#if hasData}
-            <TrendChart {series} {theme} />
-          {:else}
-            <p class="empty">No activity in this period.</p>
-          {/if}
-        </section>
+        <!-- Day view: a two-bar chart is noise, not signal — hide it. -->
+        {#if preset !== 'day'}
+          <section class="chart-wrap">
+            <h2>Opened vs. closed per {granularity === 'week' ? 'week' : 'day'}</h2>
+            {#if hasData}
+              <TrendChart {series} {theme} />
+            {:else}
+              <p class="empty">No activity in this period.</p>
+            {/if}
+          </section>
+        {/if}
       </details>
     </main>
   </div>

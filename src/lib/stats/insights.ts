@@ -48,6 +48,11 @@ const DAY = 86_400_000
 const fmtDur = (ms: number) =>
   ms >= 2 * DAY ? `${(ms / DAY).toFixed(1)}d` : `${Math.round(ms / 3_600_000)}h`
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0)
+const fmtShortDay = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'UTC',
+  month: 'short',
+  day: 'numeric',
+})
 
 export function computeInsights(
   events: ActivityEvent[],
@@ -63,11 +68,17 @@ export function computeInsights(
   const suppress = suppressedDueChanges(evs, dedupMs)
   const out: Insight[] = []
 
+  // Day mode: a window of at most ~a day (the "day" preset). The statistical
+  // insights (trends, per-priority rates, staleness) starve at this scale and
+  // are hidden; a small set of day-specific reflections is added instead.
+  const dayMode = filters.until.getTime() - filters.since.getTime() <= 36 * 3_600_000
+
   let opened = 0
   let closed = 0
   let postponed = 0
   let reprioritized = 0
   const postponesByItem = new Map<string, number>()
+  const pushTarget = new Map<string, { t: number; due: string | null }>() // latest postpone target
   const activityByProject = new Map<string, number>()
 
   for (const e of evs) {
@@ -86,6 +97,9 @@ export function computeInsights(
     }
     if (buckets.includes('postponed')) {
       postponesByItem.set(e.object_id, (postponesByItem.get(e.object_id) ?? 0) + 1)
+      const t = Date.parse(e.event_date)
+      const prev = pushTarget.get(e.object_id)
+      if (!prev || t > prev.t) pushTarget.set(e.object_id, { t, due: e.extra_data?.due_date ?? null })
     }
   }
 
@@ -101,7 +115,8 @@ export function computeInsights(
   )
 
   // ---- Are you tracking the right tasks? ----
-  if (postponed > 0) {
+  // (day mode: "3+ postpones" within a single day is churn, not chronicity)
+  if (postponed > 0 && !dayMode) {
     const serial = [...postponesByItem.entries()]
       .filter(([id, n]) => n >= 3 && !waitingIds.has(id))
       .sort((a, b) => b[1] - a[1])
@@ -142,10 +157,11 @@ export function computeInsights(
   }
 
   // ---- Does your project structure make sense? ----
+  // (all skipped in day mode — one day of activity can't judge structure)
   const liveProjects = projects.filter(
     (p) => !p.is_deleted && !p.is_archived && !p.inbox_project,
   )
-  if (liveProjects.length) {
+  if (liveProjects.length && !dayMode) {
     const dead = liveProjects.filter((p) => !activityByProject.get(p.id))
     if (dead.length > 0) {
       out.push({
@@ -159,7 +175,7 @@ export function computeInsights(
     }
   }
   const totalActivity = [...activityByProject.values()].reduce((a, b) => a + b, 0)
-  if (activityByProject.size > 1) {
+  if (activityByProject.size > 1 && !dayMode) {
     let topId = ''
     let topN = 0
     for (const [id, n] of activityByProject) if (n > topN) [topN, topId] = [n, id]
@@ -176,7 +192,7 @@ export function computeInsights(
     }
   }
   const inbox = projects.find((p) => p.inbox_project)
-  if (inbox && totalActivity > 0) {
+  if (inbox && totalActivity > 0 && !dayMode) {
     const share = pct(activityByProject.get(inbox.id) ?? 0, totalActivity)
     if (share >= 30) {
       out.push({
@@ -212,7 +228,7 @@ export function computeInsights(
     const g = mttc.get(p)
     return g?.n ? { label, avg: g.total / g.n } : null
   }).filter((x): x is { label: string; avg: number } => x != null)
-  if (speed.length >= 2) {
+  if (speed.length >= 2 && !dayMode) {
     const parts = speed.map((s) => `${s.label} ${fmtDur(s.avg)}`).join(' · ')
     let monotonic = true
     for (let i = 1; i < speed.length; i++) if (speed[i].avg < speed[i - 1].avg) monotonic = false
@@ -234,7 +250,7 @@ export function computeInsights(
           },
     )
   }
-  if (reprioritized > 0 && opened + closed > 0 && pct(reprioritized, opened + closed) >= 20) {
+  if (!dayMode && reprioritized > 0 && opened + closed > 0 && pct(reprioritized, opened + closed) >= 20) {
     out.push({
       category: 'prioritization',
       tone: 'warn',
@@ -245,7 +261,9 @@ export function computeInsights(
   }
 
   // ---- Are you executing well? ----
-  if (opened > 0) {
+  // (day mode: backlog-balance already covers today's opened-vs-closed, and
+  // pushed-forward replaces push-vs-do)
+  if (opened > 0 && !dayMode) {
     const ratio = closed / opened
     out.push({
       category: 'execution',
@@ -258,7 +276,7 @@ export function computeInsights(
           : 'You opened more than you closed — the gap becomes backlog.',
     })
   }
-  if (postponed > 0 && postponed + closed > 0 && pct(postponed, postponed + closed) >= 40) {
+  if (!dayMode && postponed > 0 && postponed + closed > 0 && pct(postponed, postponed + closed) >= 40) {
     out.push({
       category: 'execution',
       tone: 'warn',
@@ -289,7 +307,7 @@ export function computeInsights(
         !waitingIds.has(t.id) &&
         nowMs - Date.parse(t.added_at) > STALE_MS,
     )
-    if (stale.length) {
+    if (stale.length && !dayMode) {
       const byAge = [...stale].sort((a, b) => Date.parse(a.added_at) - Date.parse(b.added_at))
       const oldest = nowMs - Date.parse(byAge[0].added_at)
       out.push({
@@ -305,7 +323,7 @@ export function computeInsights(
           href: taskHref(t.id),
         })),
       })
-    } else {
+    } else if (!dayMode) {
       out.push({
         category: 'right-tasks',
         tone: 'good',
@@ -321,7 +339,7 @@ export function computeInsights(
     const heavy = [...staleByProject.entries()]
       .filter(([, n]) => n >= STALE_PROJECT_MIN)
       .sort((a, b) => b[1] - a[1])
-    if (heavy.length) {
+    if (heavy.length && !dayMode) {
       out.push({
         category: 'structure',
         tone: 'warn',
@@ -402,7 +420,7 @@ export function computeInsights(
       else closedLate++
     }
   }
-  if (closedEarly + closedLate >= 6) {
+  if (closedEarly + closedLate >= 6 && !dayMode) {
     if (closedLate >= closedEarly * 1.25) {
       out.push({
         category: 'execution',
@@ -470,7 +488,7 @@ export function computeInsights(
   }
   const rel1 = reliability(4) // P1 (highest)
   const rel4 = reliability(1) // P4 (lowest)
-  if (rel1 != null && rel4 != null) {
+  if (rel1 != null && rel4 != null && !dayMode) {
     out.push(
       rel1 >= rel4
         ? {
@@ -511,7 +529,7 @@ export function computeInsights(
   }
   const ot1 = onTime(4) // P1
   const ot4 = onTime(1) // P4
-  if (ot1 != null && ot4 != null) {
+  if (ot1 != null && ot4 != null && !dayMode) {
     out.push(
       ot1 >= ot4
         ? {
@@ -531,6 +549,127 @@ export function computeInsights(
               'You hit due dates on high-priority work less often than low — high-priority dates may be slipping.',
           },
     )
+  }
+
+  // ---- Day-only reflections (the "day" preset) ----
+  if (dayMode) {
+    const todayDay = toDay(new Date(nowMs).toISOString()) ?? ''
+
+    // Plan kept — of tasks DUE today: done, pushed elsewhere, or still open.
+    const doneDue = new Set<string>()
+    const pushedDue = new Map<string, string | null>() // id → new due date
+    for (const e of evs) {
+      const x = e.extra_data ?? {}
+      if (classify(e).includes('closed') && toDay(x.completed_due_date) === todayDay) {
+        doneDue.add(e.object_id)
+      }
+      if ('last_due_date' in x && toDay(x.last_due_date) === todayDay && toDay(x.due_date) !== todayDay) {
+        pushedDue.set(e.object_id, x.due_date ?? null)
+      }
+    }
+    for (const id of doneDue) pushedDue.delete(id) // pushed then done anyway = done
+    // Snapshot may predate today's events, so subtract what events already settled.
+    const stillDue = scopedOpen.filter(
+      (t) => toDay(t.dueDate) === todayDay && !doneDue.has(t.id) && !pushedDue.has(t.id),
+    )
+    const planTotal = doneDue.size + pushedDue.size + stillDue.length
+    if (planTotal > 0) {
+      const ratio = doneDue.size / planTotal
+      out.push({
+        category: 'execution',
+        tone: ratio >= 0.8 ? 'good' : pushedDue.size > doneDue.size ? 'warn' : 'info',
+        docId: 'plan-kept',
+        title: `Kept ${doneDue.size} of ${planTotal} due today`,
+        detail: `Due today: ${doneDue.size} done, ${pushedDue.size} pushed, ${stillDue.length} still open.`,
+        items: [
+          ...stillDue.map((t) => ({
+            id: t.id,
+            label: t.content || undefined,
+            meta: 'still open',
+            href: taskHref(t.id),
+          })),
+          ...[...pushedDue.entries()].map(([id, due]) => ({
+            id,
+            label: nameById.get(id),
+            meta: due ? `→ ${fmtShortDay.format(Date.parse(due))}` : '→ no date',
+            href: taskHref(id),
+          })),
+        ],
+      })
+    }
+
+    // Pushed forward — everything postponed today (not just the due-today ones),
+    // with where it went. The mirror image of the done list.
+    if (opened + closed + postponed > 0) {
+      if (postponed === 0) {
+        out.push({
+          category: 'execution',
+          tone: 'good',
+          docId: 'pushed-forward',
+          title: 'Nothing pushed forward today',
+          detail: 'No task got moved to a later day.',
+        })
+      } else {
+        const pushed = [...postponesByItem.entries()].sort((a, b) => b[1] - a[1])
+        out.push({
+          category: 'execution',
+          tone: pushed.length >= 3 ? 'warn' : 'info',
+          docId: 'pushed-forward',
+          title: `Pushed ${pushed.length} task${pushed.length > 1 ? 's' : ''} forward`,
+          detail: 'Tasks moved to a later day today — the mirror of your done list.',
+          items: pushed.map(([id, n]) => {
+            const due = pushTarget.get(id)?.due
+            const target = due ? `→ ${fmtShortDay.format(Date.parse(due))}` : '→ no date'
+            return {
+              id,
+              label: nameById.get(id),
+              meta: n > 1 ? `${target} · ${n}×` : target,
+              href: taskHref(id),
+            }
+          }),
+        })
+      }
+    }
+
+    // Typical day — today's closes vs your median daily closes over the recent
+    // history we already hold (up to 28 days). Borrowed baseline: a raw count
+    // means nothing without "is that normal for me?".
+    const histFilters: Filters = { ...filters, since: new Date(0) }
+    const todayStartMs = Date.parse(`${todayDay}T00:00:00Z`)
+    const closedByDay = new Map<string, number>()
+    let earliestMs = Infinity
+    for (const e of events) {
+      if (!eventInScope(e, histFilters)) continue
+      const t = Date.parse(e.event_date)
+      if (t < earliestMs) earliestMs = t
+      if (t < todayStartMs && classify(e).includes('closed')) {
+        const d = toDay(e.event_date)
+        if (d) closedByDay.set(d, (closedByDay.get(d) ?? 0) + 1)
+      }
+    }
+    const BASELINE_MAX_DAYS = 28
+    const startMs = Math.max(
+      Number.isFinite(earliestMs) ? Math.floor(earliestMs / DAY) * DAY : todayStartMs,
+      todayStartMs - BASELINE_MAX_DAYS * DAY,
+    )
+    const counts: number[] = []
+    for (let ms = startMs; ms < todayStartMs; ms += DAY) {
+      counts.push(closedByDay.get(toDay(new Date(ms).toISOString()) ?? '') ?? 0)
+    }
+    if (counts.length >= 3) {
+      const sorted = [...counts].sort((a, b) => a - b)
+      const mid = sorted.length / 2
+      const median =
+        sorted.length % 2 ? sorted[Math.floor(mid)] : (sorted[mid - 1] + sorted[mid]) / 2
+      const medianStr = Number.isInteger(median) ? String(median) : median.toFixed(1)
+      out.push({
+        category: 'execution',
+        tone: closed >= median ? 'good' : 'info',
+        docId: 'typical-day',
+        title: `Closed ${closed} today — typical day is ${medianStr}`,
+        detail: `Median daily closes over your last ${counts.length} days (with the current filters).`,
+      })
+    }
   }
 
   return out

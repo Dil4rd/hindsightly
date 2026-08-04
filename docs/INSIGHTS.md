@@ -9,6 +9,11 @@ All insights respect the active **filters** (time window, project subtree,
 priority) unless a card says otherwise. Priorities use Todoist's internal scale
 where **4 = P1 (highest)** and **1 = P4 (lowest)**.
 
+The **day** preset (calendar today) is special: statistical insights (trends,
+per-priority rates, staleness, structure) starve at one day of data and are
+hidden; a small set of [daily reflections](#daily-reflections-day-view) is shown
+instead. Backlog balance, overdue-now, and waiting-for aging remain.
+
 > **Worked examples** (small, visual "this data → this value, and note it misses
 > X") are planned but not written yet — see the roadmap. For now each card lists
 > its rule and blind spots in prose.
@@ -199,3 +204,45 @@ Data sources referenced below:
   tasks* (old + unscheduled) — an overdue task can be brand new.
 - **Source:** open-tasks snapshot (`dueDate`, `isRecurring`).
 - **Caveats:** a point-in-time snapshot; "now" is the window's end date.
+
+---
+
+## Daily reflections (day view)
+
+Shown only on the **day** preset — the end-of-day shutdown ritual. The window is
+calendar today (local midnight → now), not a rolling 24 h.
+
+### Plan kept
+
+- **Measures:** of tasks **due today** — the day's contract with yourself — how
+  many you **completed**, **pushed** to another day, or left **still open**.
+  Lists the unresolved ones (open ones marked `still open`, pushed ones with
+  their new date). A task pushed and then completed today anyway counts as done.
+- **Ignores:** tasks not due today (see *pushed forward* for all of today's
+  postpones); which priority the due work had.
+- **Source:** activity log (`completed_due_date`, due-date changes) + open-tasks
+  snapshot.
+- **Caveats:** mid-day, `still open` isn't failure — the day isn't over. **Good**
+  at ≥ 80% done; **warn** when more was pushed than done.
+
+### Pushed forward
+
+- **Measures:** every task **postponed today** (due moved to a later day),
+  most-pushed first, each with where it went (`→ Aug 12`). If today had activity
+  but zero pushes, shows "Nothing pushed forward today". The mirror image of the
+  done list.
+- **Ignores:** recurrence auto-advances (not postpones); rapid re-edits within
+  the debounce window count once.
+- **Source:** activity log.
+- **Caveats:** **warn** at 3+ pushed; pushing one thing is normal triage.
+
+### Typical day
+
+- **Measures:** tasks closed **today** vs your **median daily closes** over the
+  recent history already fetched (up to 28 days) — a raw count means nothing
+  without "is that normal for me?".
+- **Ignores:** nothing extra — same close definition as the `closed` metric
+  (recurring included); respects project/priority filters.
+- **Source:** activity log (history beyond today's window).
+- **Caveats:** needs ≥ 3 prior days of data; the baseline only spans what's been
+  fetched (free plans: ~7 days), and prior days use UTC day boundaries.

@@ -8,7 +8,7 @@ import { eventInScope, type Filters, type TimePreset } from './filters'
 export type Granularity = 'day' | 'week'
 
 export function granularityFor(preset: TimePreset): Granularity {
-  return preset === 'week' || preset === 'month' ? 'day' : 'week'
+  return preset === 'quarter' || preset === 'year' ? 'week' : 'day'
 }
 
 export interface TrendSeries {

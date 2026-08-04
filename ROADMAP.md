@@ -25,6 +25,12 @@ probe-confirmed (2026-07): the "confirmed" ones only need build work.
       free activity cap makes streaks unmeasurable).
 - [ ] **Workload balance across P1–P4** — flag a skewed priority mix (e.g. 90%
       P1, or no P3s). Distinct from the existing speed/reliability insights.
+- [ ] **Day-view follow-ups** — v1 shipped (plan-kept, pushed-forward,
+      typical-day baseline). Candidates if it proves useful: **reactive share**
+      (tasks created *and* completed today = firefighting, invisible in weekly
+      aggregates), a **P1 check** ("your P1s due today: 2 of 2 done"), and an
+      **hourly opened/closed histogram** (events carry full timestamps) showing
+      when in the day work actually happens.
 
 ## Later
 

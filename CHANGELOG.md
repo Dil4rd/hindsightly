@@ -10,6 +10,18 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
 
 ### Added
 
+- Daily overview — a new **day** preset (calendar today, local midnight → now)
+  as an end-of-day reflection. Statistical insights that starve on one day of
+  data (trends, per-priority rates, staleness, structure) are hidden; instead
+  the day view shows: **plan kept** (of tasks due today: done / pushed / still
+  open, with the unresolved ones listed), **pushed forward** (everything moved
+  to a later day, with its new date — the mirror of the done list), and
+  **typical day** (today's closes vs your median daily closes over the recent
+  history, so the count has a personal baseline). Metric cards + drilldowns,
+  backlog balance, overdue-now, and waiting-for aging remain. The trend chart is
+  hidden (two bars aren't a trend). Works on free accounts (second ungated
+  preset besides week).
+
 - Waiting-for aging insight — open tasks tagged as a GTD "waiting-for"
   (delegated / blocked / awaiting a reply) that have been pending over 14 days,
   listed oldest-first to chase or drop. The card stays dormant until a task
