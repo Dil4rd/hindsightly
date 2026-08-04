@@ -1,7 +1,7 @@
 <script lang="ts">
   import uPlot from 'uplot'
   import 'uplot/dist/uPlot.min.css'
-  import type { TrendSeries } from '../lib/stats/series'
+  import { DAY_PARTS, type TrendSeries } from '../lib/stats/series'
 
   let { series, theme }: { series: TrendSeries; theme: 'dark' | 'light' } = $props()
 
@@ -11,6 +11,7 @@
   let el: HTMLDivElement
   let chart: uPlot | undefined
   let builtTheme: string | undefined
+  let builtGranularity: string | undefined
 
   // Chart colors per theme (deterministic — uPlot needs concrete strings).
   const PALETTE = {
@@ -27,24 +28,39 @@
 
   const toData = (s: TrendSeries): uPlot.AlignedData => [s.t, s.opened, s.closed]
 
-  // All formatting in UTC (daily points sit at UTC midnight; local rendering
-  // would show a misleading "1am").
+  // Day/week formatting in UTC (daily points sit at UTC midnight; local
+  // rendering would show a misleading "1am"). Day-part buckets are categorical
+  // (already local-time slots by construction).
   const fmtDate = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
   const fmtWeekday = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' })
 
-  const fmtHover = (ms: number) =>
-    series.granularity === 'week'
-      ? `Week of ${fmtDate.format(ms)}`
-      : `${fmtWeekday.format(ms)}, ${fmtDate.format(ms)}`
+  const hh = (h: number) => `${String(h).padStart(2, '0')}:00`
+  const partLabel = (i: number) => DAY_PARTS[i]?.label ?? ''
+  const partRange = (i: number) => {
+    const p = DAY_PARTS[i]
+    return p ? `${hh(p.from)}–${hh(p.to % 24)}` : ''
+  }
+
+  // Hover caption: for day-part the x value IS the part index, not a time.
+  const fmtHoverX = (x: number) =>
+    series.granularity === 'daypart'
+      ? `${partLabel(x)}, ${partRange(x)}`
+      : series.granularity === 'week'
+        ? `Week of ${fmtDate.format(x * 1000)}`
+        : `${fmtWeekday.format(x * 1000)}, ${fmtDate.format(x * 1000)}`
 
   const DAY_SEC = 86_400
   // Whole-day tick increments only (prevents uPlot from placing 2 sub-day ticks
-  // on the same calendar day, which produced duplicate labels).
-  const AXIS_INCRS = [1, 2, 3, 4, 7, 14, 30, 60, 90, 180, 365].map((d) => d * DAY_SEC)
+  // on the same calendar day, which produced duplicate labels). Day-part view
+  // is categorical: one tick per slot.
+  const DAY_INCRS = [1, 2, 3, 4, 7, 14, 30, 60, 90, 180, 365].map((d) => d * DAY_SEC)
+  const axisIncrs = () => (series.granularity === 'daypart' ? [1] : DAY_INCRS)
   // Integer-only y ticks — task counts are whole numbers (no 0.2, 0.4, …).
   const Y_INCRS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]
 
-  const stepSec = () => (series.granularity === 'week' ? 7 * DAY_SEC : DAY_SEC)
+  // x distance between buckets: category indices for day-part, seconds otherwise.
+  const stepSec = () =>
+    series.granularity === 'daypart' ? 1 : series.granularity === 'week' ? 7 * DAY_SEC : DAY_SEC
 
   // Behind the series: weekend shading (day view) + vertical separators at each
   // bucket BOUNDARY, so labels sit centered between the lines (one slot per day),
@@ -102,7 +118,7 @@
     hover = true
     hoverOpened = (u.data[1][idx] as number) ?? 0
     hoverClosed = (u.data[2][idx] as number) ?? 0
-    hoverWhen = fmtHover((u.data[0][idx] as number) * 1000)
+    hoverWhen = fmtHoverX(u.data[0][idx] as number)
   }
 
   function options(width: number): uPlot.Options {
@@ -111,9 +127,13 @@
       height: 240,
       // Headroom so the tallest bar isn't at the top edge and the top tick is labeled.
       scales: {
-        // Pad by half a bucket so each day/week gets a full slot between the
-        // boundary separators (and edge bars aren't clipped).
-        x: { time: true, range: (_u, dmin, dmax) => [dmin - stepSec() / 2, dmax + stepSec() / 2] },
+        // Pad by half a bucket so each slot sits between the boundary
+        // separators (and edge bars aren't clipped). Day-part x values are
+        // category indices, not timestamps.
+        x: {
+          time: series.granularity !== 'daypart',
+          range: (_u, dmin, dmax) => [dmin - stepSec() / 2, dmax + stepSec() / 2],
+        },
         y: { range: (_u, _min, max) => [0, Math.max(1, Math.ceil(max * 1.15))] },
       },
       legend: { show: false },
@@ -136,13 +156,17 @@
           // uPlot's own centered x-grid and ticks.
           grid: { show: false },
           ticks: { show: false },
-          incrs: AXIS_INCRS,
+          incrs: axisIncrs(),
           space: 44, // min px per tick (narrow 2-line labels → denser ticks)
           size: 54, // room for two label lines (date + weekday) without clipping
           values: (_u, splits) =>
             splits.map((s) => {
+              // Day-part view: slot name on top, hour range below. Day view:
+              // date on top, weekday below. Week view: just the date.
+              if (series.granularity === 'daypart') {
+                return Number.isInteger(s) ? `${partLabel(s)}\n${partRange(s)}` : ''
+              }
               const ms = s * 1000
-              // Day view: date on top, weekday below. Week view: just the date.
               return series.granularity === 'week'
                 ? fmtDate.format(ms)
                 : `${fmtDate.format(ms)}\n${fmtWeekday.format(ms)}`
@@ -163,11 +187,13 @@
   $effect(() => {
     const t = theme
     const data = toData(series)
-    // Recreate on theme change so axis/grid colors update; otherwise just setData.
-    if (!chart || builtTheme !== t) {
+    // Recreate on theme change (axis/grid colors) or granularity change (the
+    // axis `incrs` are baked in at build time); otherwise just setData.
+    if (!chart || builtTheme !== t || builtGranularity !== series.granularity) {
       chart?.destroy()
       chart = new uPlot(options(el.clientWidth || 600), data, el)
       builtTheme = t
+      builtGranularity = series.granularity
     } else {
       chart.setData(data)
     }

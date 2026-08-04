@@ -459,17 +459,14 @@
           />
         </section>
 
-        <!-- Day view: a two-bar chart is noise, not signal — hide it. -->
-        {#if preset !== 'day'}
-          <section class="chart-wrap">
-            <h2>Opened vs. closed per {granularity === 'week' ? 'week' : 'day'}</h2>
-            {#if hasData}
-              <TrendChart {series} {theme} />
-            {:else}
-              <p class="empty">No activity in this period.</p>
-            {/if}
-          </section>
-        {/if}
+        <section class="chart-wrap">
+          <h2>Opened vs. closed {granularity === 'daypart' ? 'by time of day' : `per ${granularity}`}</h2>
+          {#if hasData}
+            <TrendChart {series} {theme} />
+          {:else}
+            <p class="empty">No activity in this period.</p>
+          {/if}
+        </section>
       </details>
     </main>
   </div>

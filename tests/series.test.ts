@@ -36,6 +36,24 @@ describe('granularityFor', () => {
 })
 
 describe('trendSeries', () => {
+  it('daypart buckets split the day into 5 local-time slots', () => {
+    // Construct dates from LOCAL components so the local-hour bucketing is
+    // deterministic regardless of the test machine's timezone.
+    const local = (h: number, m = 0) => new Date(2026, 5, 10, h, m).toISOString()
+    const evs = [
+      ev('added', local(7)), // Morning (06–11)
+      ev('added', local(10, 30)), // Morning
+      ev('completed', local(15)), // Afternoon (14–18)
+    ]
+    const f = filters({ since: new Date(2026, 5, 10), until: new Date(2026, 5, 10, 18) })
+    const s = trendSeries(evs, f, 'daypart')
+    expect(s.granularity).toBe('daypart')
+    expect(s.t).toEqual([0, 1, 2, 3, 4]) // all 5 slots, always
+    expect(s.opened[1]).toBe(2)
+    expect(s.closed[3]).toBe(1)
+    expect(s.opened[0] + s.opened[2] + s.opened[4]).toBe(0)
+  })
+
   it('day buckets count opened/closed per calendar day', () => {
     const evs = [
       ev('added', '2026-06-10T10:00:00Z'),

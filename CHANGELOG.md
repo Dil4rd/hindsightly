@@ -18,9 +18,10 @@ builds and attaches the single-file artifact (see `.github/workflows/release.yml
   to a later day, with its new date — the mirror of the done list), and
   **typical day** (today's closes vs your median daily closes over the recent
   history, so the count has a personal baseline). Metric cards + drilldowns,
-  backlog balance, overdue-now, and waiting-for aging remain. The trend chart is
-  hidden (two bars aren't a trend). Works on free accounts (second ungated
-  preset besides week).
+  backlog balance, overdue-now, and waiting-for aging remain. The trend chart
+  becomes an opened-vs-closed histogram **by time of day** (Night / Morning /
+  Noon / Afternoon / Evening, local clock — hourly would be too sparse). Works
+  on free accounts (second ungated preset besides week).
 
 - Waiting-for aging insight — open tasks tagged as a GTD "waiting-for"
   (delegated / blocked / awaiting a reply) that have been pending over 14 days,

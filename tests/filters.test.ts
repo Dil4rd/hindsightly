@@ -18,8 +18,8 @@ describe('presetWindow', () => {
 })
 
 describe('granularityFor', () => {
-  it('buckets day/week/month by day; quarter/year by week', () => {
-    expect(granularityFor('day')).toBe('day')
+  it('buckets day by day-part; week/month by day; quarter/year by week', () => {
+    expect(granularityFor('day')).toBe('daypart')
     expect(granularityFor('week')).toBe('day')
     expect(granularityFor('month')).toBe('day')
     expect(granularityFor('quarter')).toBe('week')
