@@ -67,3 +67,42 @@ export function classify(ev: ActivityEvent): MetricBucket[] {
 
   return out
 }
+
+// Due-date buckets (the ones a reschedule debounce applies to).
+const DUE_BUCKETS = new Set<MetricBucket>(['postponed', 'rescheduled', 'scheduled', 'unscheduled'])
+
+const isDueChange = (e: ActivityEvent): boolean => classify(e).some((b) => DUE_BUCKETS.has(b))
+
+/**
+ * Ids of due-change events to NOT count: when the same task has multiple
+ * due-date changes within `windowMs` of a kept one, the extras are suppressed
+ * (a burst of edits ≈ a typo correction, not real rescheduling).
+ */
+export function suppressedDueChanges(events: ActivityEvent[], windowMs: number): Set<number> {
+  const suppress = new Set<number>()
+  if (windowMs <= 0) return suppress
+
+  const byItem = new Map<string, Array<{ id: number; t: number }>>()
+  for (const e of events) {
+    if (!isDueChange(e)) continue
+    const arr = byItem.get(e.object_id) ?? []
+    arr.push({ id: e.id, t: Date.parse(e.event_date) })
+    byItem.set(e.object_id, arr)
+  }
+
+  for (const arr of byItem.values()) {
+    arr.sort((a, b) => a.t - b.t)
+    let lastKept = -Infinity
+    for (const { id, t } of arr) {
+      if (t - lastKept < windowMs) suppress.add(id)
+      else lastKept = t
+    }
+  }
+  return suppress
+}
+
+/** classify(), minus due-change buckets for debounce-suppressed events. */
+export function countedBuckets(e: ActivityEvent, suppress: Set<number>): MetricBucket[] {
+  const buckets = classify(e)
+  return suppress.has(e.id) ? buckets.filter((b) => !DUE_BUCKETS.has(b)) : buckets
+}

@@ -3,9 +3,20 @@
 // header is not a CORS "credential", so `credentials: 'omit'` makes direct
 // browser calls work.
 
-import type { ActivityEvent, CompletedItem, Page, Project } from './types'
+import type { ActivityEvent, CompletedItem, Label, OpenTask, Page, Project } from './types'
 
 const BASE = 'https://api.todoist.com'
+
+// Raw active-task shape (subset) — `due` carries recurrence + next date.
+interface RawTask {
+  id: string
+  content: string
+  project_id: string
+  priority: number
+  added_at: string
+  due: { date?: string; is_recurring?: boolean } | null
+  labels?: string[]
+}
 
 export class TodoistClient {
   constructor(private readonly token: string) {}
@@ -50,6 +61,42 @@ export class TodoistClient {
 
   listProjects(): Promise<Project[]> {
     return this.paginate<Project>('/api/v1/projects', { limit: 200 }, (p) => p.results ?? [])
+  }
+
+  /** The account's personal labels (id + name) — for the waiting-for picker. */
+  listLabels(): Promise<Label[]> {
+    return this.paginate<Label>('/api/v1/labels', { limit: 200 }, (p) => p.results ?? [])
+  }
+
+  /** Current active (open) tasks — a snapshot, not windowed. */
+  async listOpenTasks(): Promise<OpenTask[]> {
+    const raw = await this.paginate<RawTask>('/api/v1/tasks', { limit: 200 }, (p) => p.results ?? [])
+    return raw.map((r) => ({
+      id: r.id,
+      content: r.content,
+      project_id: r.project_id,
+      priority: r.priority,
+      added_at: r.added_at,
+      dueDate: r.due?.date ?? null,
+      isRecurring: !!r.due?.is_recurring,
+      labels: r.labels ?? [],
+    }))
+  }
+
+  /**
+   * Whether the account is Todoist Pro. Reads only the `is_premium` flag — the
+   * rest of the /user payload (email, name, token) is discarded, never stored.
+   * Free accounts keep only ~7 days of activity log, so longer windows are gated.
+   */
+  async isPremium(): Promise<boolean> {
+    const res = await fetch(new URL(BASE + '/api/v1/user'), {
+      method: 'GET',
+      credentials: 'omit',
+      headers: { Authorization: `Bearer ${this.token}` },
+    })
+    if (!res.ok) throw new Error(`Todoist API ${res.status}`)
+    const user = (await res.json()) as { is_premium?: boolean }
+    return user.is_premium === true
   }
 
   /**

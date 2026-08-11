@@ -1,10 +1,11 @@
-// Minimal IndexedDB wrapper. One database, two single-record stores:
-//   - 'vault' : the passkey-encrypted token
-//   - 'cache' : the persisted (content-stripped) Todoist dataset
+// Minimal IndexedDB wrapper. One database, three single-record stores:
+//   - 'vault'    : the passkey-encrypted token
+//   - 'cache'    : the persisted (content-stripped) Todoist dataset
+//   - 'settings' : the passkey-encrypted user settings (waiting-for label ids)
 
 const DB_NAME = 'hindsightly'
-const DB_VERSION = 2
-const STORES = ['vault', 'cache'] as const
+const DB_VERSION = 3
+const STORES = ['vault', 'cache', 'settings'] as const
 type Store = (typeof STORES)[number]
 const KEY = 'default'
 
@@ -70,3 +71,8 @@ export const idbClear = () => del('vault')
 export const cacheGet = <T>() => get<T>('cache')
 export const cacheSet = <T>(v: T) => put<T>('cache', v)
 export const cacheClear = () => del('cache')
+
+// settings store (used by the encrypted user settings)
+export const settingsGet = <T>() => get<T>('settings')
+export const settingsSet = <T>(v: T) => put<T>('settings', v)
+export const settingsClear = () => del('settings')

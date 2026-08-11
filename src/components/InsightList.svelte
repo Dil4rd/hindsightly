@@ -5,8 +5,15 @@
     type Insight,
     type InsightCategory,
   } from '../lib/stats/insights'
+  import { INSIGHTS_DOC_URL } from '../lib/config'
 
-  let { insights }: { insights: Insight[] } = $props()
+  let {
+    insights,
+    onSelect,
+    scoped = false,
+  }: { insights: Insight[]; onSelect: (i: Insight) => void; scoped?: boolean } = $props()
+
+  const docUrl = (id: string) => `${INSIGHTS_DOC_URL}#${id}`
 
   const byCat = $derived(
     Object.fromEntries(
@@ -19,14 +26,39 @@
   {#each INSIGHT_CATEGORIES as c (c)}
     <section class="group">
       <h3>{INSIGHT_QUESTIONS[c]}</h3>
-      {#if byCat[c].length}
+      {#if c === 'structure' && scoped}
+        <p class="none">Structure is a whole-system view — clear the project filter to see it.</p>
+      {:else if byCat[c].length}
         <ul>
           {#each byCat[c] as ins, i (i)}
             <li class={ins.tone}>
-              <span class="dot" aria-hidden="true"></span>
-              <div class="text">
-                <strong>{ins.title}</strong>
-                <span class="detail">{ins.detail}</span>
+              <div class="rowwrap">
+                {#if ins.items?.length}
+                  <button type="button" class="row clickable" onclick={() => onSelect(ins)}>
+                    <span class="dot" aria-hidden="true"></span>
+                    <span class="text">
+                      <strong>{ins.title}</strong>
+                      <span class="detail">{ins.detail}</span>
+                    </span>
+                    <span class="count">{ins.items.length} ›</span>
+                  </button>
+                {:else}
+                  <div class="row">
+                    <span class="dot" aria-hidden="true"></span>
+                    <span class="text">
+                      <strong>{ins.title}</strong>
+                      <span class="detail">{ins.detail}</span>
+                    </span>
+                  </div>
+                {/if}
+                <a
+                  class="info"
+                  href={docUrl(ins.docId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="How this insight works"
+                  aria-label="How this insight works">ⓘ</a
+                >
               </div>
             </li>
           {/each}
@@ -63,10 +95,45 @@
     flex-direction: column;
     gap: 0.7rem;
   }
-  li {
+  .rowwrap {
+    display: flex;
+    align-items: start;
+    gap: 0.4rem;
+  }
+  .row {
     display: flex;
     gap: 0.6rem;
     align-items: start;
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: left;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+  }
+  .info {
+    flex: 0 0 auto;
+    align-self: center; /* vertically centered with the row, matching the › count */
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+    line-height: 1;
+    opacity: 0.55;
+  }
+  .info:hover {
+    opacity: 1;
+    color: var(--accent);
+  }
+  button.clickable {
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 0.3rem;
+    margin: -0.3rem;
+  }
+  button.clickable:hover {
+    background: var(--bg);
   }
   .dot {
     flex: 0 0 auto;
@@ -89,6 +156,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   strong {
     font-size: 0.9rem;
@@ -98,6 +167,12 @@
     font-size: 0.78rem;
     color: var(--muted);
     line-height: 1.35;
+  }
+  .count {
+    flex: 0 0 auto;
+    align-self: center;
+    font-size: 0.8rem;
+    color: var(--muted);
   }
   .none {
     margin: 0;

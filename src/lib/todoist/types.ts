@@ -26,6 +26,8 @@ export interface ActivityExtraData {
   priority?: number
   last_priority?: number
   is_recurring?: boolean
+  completed_due_date?: string | null // due date of a completed occurrence
+  was_overdue?: boolean // whether a completed task was past its due date
   name?: string
 }
 
@@ -48,6 +50,22 @@ export interface CompletedItem {
   added_at: string
   completed_at: string
   due: unknown | null
+}
+
+export interface OpenTask {
+  id: string
+  content: string
+  project_id: string
+  priority: number // 1..4, 4 = highest
+  added_at: string
+  dueDate: string | null // next due (YYYY-MM-DD or datetime); timeline only
+  isRecurring: boolean
+  labels: string[] // GTD role tags (waiting/someday/…); in-memory only, cache-stripped
+}
+
+export interface Label {
+  id: string
+  name: string
 }
 
 export interface Page<T> {

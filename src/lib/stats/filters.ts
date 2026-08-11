@@ -11,13 +11,25 @@ export interface Filters {
   priority: number | null
 }
 
-export type TimePreset = 'week' | 'month' | 'quarter' | 'year'
+export type TimePreset = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
-const DAYS: Record<TimePreset, number> = { week: 7, month: 30, quarter: 90, year: 365 }
+const DAYS: Record<Exclude<TimePreset, 'day'>, number> = {
+  week: 7,
+  month: 30,
+  quarter: 90,
+  year: 365,
+}
 
-/** Rolling window ending at `now`. Default classifier is 'week'. */
+/**
+ * Rolling window ending at `now`. Default classifier is 'week'.
+ * 'day' is CALENDAR today (local midnight → now), not a rolling 24h — it's a
+ * reflection on *this day*, so yesterday evening doesn't belong in it.
+ */
 export function presetWindow(preset: TimePreset, now: Date): { since: Date; until: Date } {
   const until = now
+  if (preset === 'day') {
+    return { since: new Date(now.getFullYear(), now.getMonth(), now.getDate()), until }
+  }
   const since = new Date(now.getTime() - DAYS[preset] * 86_400_000)
   return { since, until }
 }

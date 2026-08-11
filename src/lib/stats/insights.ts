@@ -2,19 +2,33 @@
 // questions. Pure — computed from the same in-scope data as the metrics, so it
 // follows the time / project / priority filters.
 
-import type { ActivityEvent, CompletedItem, Project } from '../todoist/types'
-import { classify } from './events'
+import type { ActivityEvent, CompletedItem, OpenTask, Project } from '../todoist/types'
+import { classify, countedBuckets, suppressedDueChanges, toDay } from './events'
+import { taskNameIndex } from './names'
 import { completedInScope, eventInScope, type Filters } from './filters'
+import { RESCHEDULE_DEDUP_MS } from '../config'
 
 export type InsightTone = 'good' | 'warn' | 'info'
 export type InsightCategory = 'right-tasks' | 'structure' | 'prioritization' | 'execution'
+
+export interface InsightItem {
+  id: string
+  label?: string // task/project name when known (in-memory only; absent after reload)
+  meta?: string // e.g. "4×" or "37d"
+  href: string // deep link into Todoist
+}
 
 export interface Insight {
   category: InsightCategory
   tone: InsightTone
   title: string
   detail: string
+  docId: string // anchor in docs/INSIGHTS.md explaining how this insight works
+  items?: InsightItem[] // offenders, for the actionable drill-down drawer
 }
+
+const taskHref = (id: string) => `https://app.todoist.com/app/task/${id}`
+const projectHref = (id: string) => `https://app.todoist.com/app/project/${id}`
 
 export const INSIGHT_CATEGORIES: InsightCategory[] = [
   'right-tasks',
@@ -34,26 +48,41 @@ const DAY = 86_400_000
 const fmtDur = (ms: number) =>
   ms >= 2 * DAY ? `${(ms / DAY).toFixed(1)}d` : `${Math.round(ms / 3_600_000)}h`
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0)
+const fmtShortDay = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'UTC',
+  month: 'short',
+  day: 'numeric',
+})
 
 export function computeInsights(
   events: ActivityEvent[],
   completed: CompletedItem[],
   projects: Project[],
+  openTasks: OpenTask[],
   filters: Filters,
+  dedupMs: number = RESCHEDULE_DEDUP_MS,
+  waitingLabels: Set<string> = new Set(), // lowercased label names → waiting-for role (opt-in; empty = off)
 ): Insight[] {
   const evs = events.filter((e) => eventInScope(e, filters))
   const done = completed.filter((c) => completedInScope(c, filters))
+  const suppress = suppressedDueChanges(evs, dedupMs)
   const out: Insight[] = []
+
+  // Day mode: a window of at most ~a day (the "day" preset). The statistical
+  // insights (trends, per-priority rates, staleness) starve at this scale and
+  // are hidden; a small set of day-specific reflections is added instead.
+  const dayMode = filters.until.getTime() - filters.since.getTime() <= 36 * 3_600_000
 
   let opened = 0
   let closed = 0
   let postponed = 0
   let reprioritized = 0
   const postponesByItem = new Map<string, number>()
+  const pushTarget = new Map<string, { t: number; due: string | null }>() // latest postpone target
   const activityByProject = new Map<string, number>()
 
   for (const e of evs) {
-    const buckets = classify(e)
+    const buckets = countedBuckets(e, suppress)
     for (const b of buckets) {
       if (b === 'opened') opened++
       else if (b === 'closed') closed++
@@ -68,24 +97,49 @@ export function computeInsights(
     }
     if (buckets.includes('postponed')) {
       postponesByItem.set(e.object_id, (postponesByItem.get(e.object_id) ?? 0) + 1)
+      const t = Date.parse(e.event_date)
+      const prev = pushTarget.get(e.object_id)
+      if (!prev || t > prev.t) pushTarget.set(e.object_id, { t, due: e.extra_data?.due_date ?? null })
     }
   }
 
+  const nameById = taskNameIndex(events, completed, openTasks)
+  const recurringIds = new Set(openTasks.filter((t) => t.isRecurring).map((t) => t.id))
+  // Tasks the user tagged as a GTD "waiting-for" (delegated/blocked). These are
+  // parked on purpose, so they're excused from the stale / serial-postponer
+  // signals and instead get their own aging insight below.
+  const waitingIds = new Set(
+    openTasks
+      .filter((t) => (t.labels ?? []).some((l) => waitingLabels.has(l.toLowerCase())))
+      .map((t) => t.id),
+  )
+
   // ---- Are you tracking the right tasks? ----
-  if (postponed > 0) {
-    const serial = [...postponesByItem.values()].filter((n) => n >= 3).length
+  // (day mode: "3+ postpones" within a single day is churn, not chronicity)
+  if (postponed > 0 && !dayMode) {
+    const serial = [...postponesByItem.entries()]
+      .filter(([id, n]) => n >= 3 && !waitingIds.has(id))
+      .sort((a, b) => b[1] - a[1])
     out.push(
-      serial > 0
+      serial.length > 0
         ? {
             category: 'right-tasks',
             tone: 'warn',
-            title: `${serial} task${serial > 1 ? 's' : ''} postponed 3+ times`,
+            docId: 'serial-postponers',
+            title: `${serial.length} task${serial.length > 1 ? 's' : ''} postponed 3+ times`,
             detail:
               'Repeatedly pushed tasks are often the wrong task, too big, or avoided — break them down or drop them.',
+            items: serial.map(([id, n]) => ({
+              id,
+              label: nameById.get(id),
+              meta: recurringIds.has(id) ? `${n}× · recurring` : `${n}×`,
+              href: taskHref(id),
+            })),
           }
         : {
             category: 'right-tasks',
             tone: 'good',
+            docId: 'serial-postponers',
             title: 'No chronic postponers',
             detail: 'No task was pushed to a later day three or more times.',
           },
@@ -96,28 +150,32 @@ export function computeInsights(
     out.push({
       category: 'right-tasks',
       tone: net > 0 ? 'warn' : 'good',
+      docId: 'backlog-balance',
       title: net > 0 ? `Backlog grew by ${net}` : net < 0 ? `Backlog shrank by ${-net}` : 'Backlog held steady',
       detail: `Opened ${opened}, closed ${closed} in this period.`,
     })
   }
 
   // ---- Does your project structure make sense? ----
+  // (all skipped in day mode — one day of activity can't judge structure)
   const liveProjects = projects.filter(
     (p) => !p.is_deleted && !p.is_archived && !p.inbox_project,
   )
-  if (liveProjects.length) {
-    const dead = liveProjects.filter((p) => !activityByProject.get(p.id)).length
-    if (dead > 0) {
+  if (liveProjects.length && !dayMode) {
+    const dead = liveProjects.filter((p) => !activityByProject.get(p.id))
+    if (dead.length > 0) {
       out.push({
         category: 'structure',
         tone: 'info',
-        title: `${dead} project${dead > 1 ? 's' : ''} with no activity`,
+        docId: 'inactive-projects',
+        title: `${dead.length} project${dead.length > 1 ? 's' : ''} with no activity`,
         detail: 'Inactive projects add noise — consider archiving them.',
+        items: dead.map((p) => ({ id: p.id, label: p.name, href: projectHref(p.id) })),
       })
     }
   }
   const totalActivity = [...activityByProject.values()].reduce((a, b) => a + b, 0)
-  if (activityByProject.size > 1) {
+  if (activityByProject.size > 1 && !dayMode) {
     let topId = ''
     let topN = 0
     for (const [id, n] of activityByProject) if (n > topN) [topN, topId] = [n, id]
@@ -127,18 +185,20 @@ export function computeInsights(
       out.push({
         category: 'structure',
         tone: 'info',
+        docId: 'project-concentration',
         title: `${share}% of activity in “${name}”`,
         detail: 'Most of your activity is concentrated in a single project.',
       })
     }
   }
   const inbox = projects.find((p) => p.inbox_project)
-  if (inbox && totalActivity > 0) {
+  if (inbox && totalActivity > 0 && !dayMode) {
     const share = pct(activityByProject.get(inbox.id) ?? 0, totalActivity)
     if (share >= 30) {
       out.push({
         category: 'structure',
         tone: 'warn',
+        docId: 'inbox-usage',
         title: `${share}% of activity stayed in Inbox`,
         detail: 'Tasks lingering in Inbox usually means they aren’t organized into projects.',
       })
@@ -157,42 +217,58 @@ export function computeInsights(
       mttc.set(c.priority, g)
     }
   }
-  const hi = mttc.get(4)
-  const lo = mttc.get(1)
-  if (hi?.n && lo?.n) {
-    const hiAvg = hi.total / hi.n
-    const loAvg = lo.total / lo.n
+  // Speed gradient — P1 should finish fastest, P4 slowest.
+  const PRI: Array<[number, string]> = [
+    [4, 'P1'],
+    [3, 'P2'],
+    [2, 'P3'],
+    [1, 'P4'],
+  ]
+  const speed = PRI.map(([p, label]) => {
+    const g = mttc.get(p)
+    return g?.n ? { label, avg: g.total / g.n } : null
+  }).filter((x): x is { label: string; avg: number } => x != null)
+  if (speed.length >= 2 && !dayMode) {
+    const parts = speed.map((s) => `${s.label} ${fmtDur(s.avg)}`).join(' · ')
+    let monotonic = true
+    for (let i = 1; i < speed.length; i++) if (speed[i].avg < speed[i - 1].avg) monotonic = false
     out.push(
-      hiAvg <= loAvg
+      monotonic
         ? {
             category: 'prioritization',
             tone: 'good',
-            title: `P1 finishes faster (${fmtDur(hiAvg)} vs P4 ${fmtDur(loAvg)})`,
-            detail: 'High-priority tasks complete sooner than low — priorities are guiding execution.',
+            docId: 'completion-speed-by-priority',
+            title: 'Higher priorities finish faster',
+            detail: `Mean time to complete by priority: ${parts}.`,
           }
         : {
             category: 'prioritization',
             tone: 'warn',
-            title: `P1 is slower than P4 (${fmtDur(hiAvg)} vs ${fmtDur(loAvg)})`,
-            detail: 'High-priority tasks take longer than low — priorities may not reflect what you do.',
+            docId: 'completion-speed-by-priority',
+            title: 'Priority doesn’t track completion speed',
+            detail: `Expected P1 fastest → P4 slowest; actual: ${parts}.`,
           },
     )
   }
-  if (reprioritized > 0 && opened + closed > 0 && pct(reprioritized, opened + closed) >= 20) {
+  if (!dayMode && reprioritized > 0 && opened + closed > 0 && pct(reprioritized, opened + closed) >= 20) {
     out.push({
       category: 'prioritization',
       tone: 'warn',
+      docId: 'reprioritization-churn',
       title: `${reprioritized} reprioritizations`,
       detail: 'Frequent priority changes suggest priorities aren’t clear when tasks are created.',
     })
   }
 
   // ---- Are you executing well? ----
-  if (opened > 0) {
+  // (day mode: backlog-balance already covers today's opened-vs-closed, and
+  // pushed-forward replaces push-vs-do)
+  if (opened > 0 && !dayMode) {
     const ratio = closed / opened
     out.push({
       category: 'execution',
       tone: ratio >= 0.9 ? 'good' : 'warn',
+      docId: 'closed-vs-opened',
       title: `Closed ${Math.round(ratio * 100)}% of what you opened`,
       detail:
         ratio >= 1
@@ -200,13 +276,400 @@ export function computeInsights(
           : 'You opened more than you closed — the gap becomes backlog.',
     })
   }
-  if (postponed > 0 && postponed + closed > 0 && pct(postponed, postponed + closed) >= 40) {
+  if (!dayMode && postponed > 0 && postponed + closed > 0 && pct(postponed, postponed + closed) >= 40) {
     out.push({
       category: 'execution',
       tone: 'warn',
+      docId: 'push-vs-do',
       title: `${pct(postponed, postponed + closed)}% push-vs-do`,
       detail: `You postponed ${postponed} task(s) vs closing ${closed} — a lot of pushing relative to doing.`,
     })
+  }
+
+  // ---- Stale open tasks (current snapshot; project/priority filtered) ----
+  const nowMs = filters.until.getTime()
+  const STALE_MS = 30 * DAY
+  const STALE_PROJECT_MIN = 5 // flag projects accumulating this many stale tasks
+  const scopedOpen = openTasks.filter(
+    (t) =>
+      (!filters.projectIds || filters.projectIds.has(t.project_id)) &&
+      (filters.priority == null || t.priority === filters.priority),
+  )
+  if (scopedOpen.length) {
+    // Stale = old AND not actively scheduled: skip recurring tasks (alive
+    // routines) and tasks with a future due date (they're planned, not stuck).
+    const today = toDay(new Date(nowMs).toISOString()) ?? ''
+    const futureScheduled = (t: OpenTask) => t.dueDate != null && (toDay(t.dueDate) ?? '') >= today
+    const stale = scopedOpen.filter(
+      (t) =>
+        !t.isRecurring &&
+        !futureScheduled(t) &&
+        !waitingIds.has(t.id) &&
+        nowMs - Date.parse(t.added_at) > STALE_MS,
+    )
+    if (stale.length && !dayMode) {
+      const byAge = [...stale].sort((a, b) => Date.parse(a.added_at) - Date.parse(b.added_at))
+      const oldest = nowMs - Date.parse(byAge[0].added_at)
+      out.push({
+        category: 'right-tasks',
+        tone: 'warn',
+        docId: 'stale-open-tasks',
+        title: `${stale.length} open task${stale.length > 1 ? 's' : ''} older than 30 days`,
+        detail: `Long-open tasks may be stuck, stale, or need breaking down (oldest: ${Math.round(oldest / DAY)} days).`,
+        items: byAge.map((t) => ({
+          id: t.id,
+          label: t.content || undefined,
+          meta: `${Math.round((nowMs - Date.parse(t.added_at)) / DAY)}d`,
+          href: taskHref(t.id),
+        })),
+      })
+    } else if (!dayMode) {
+      out.push({
+        category: 'right-tasks',
+        tone: 'good',
+        docId: 'stale-open-tasks',
+        title: 'No stale open tasks',
+        detail: 'Every open task in scope is under 30 days old.',
+      })
+    }
+
+    // Projects accumulating many stale tasks (structure signal).
+    const staleByProject = new Map<string, number>()
+    for (const t of stale) staleByProject.set(t.project_id, (staleByProject.get(t.project_id) ?? 0) + 1)
+    const heavy = [...staleByProject.entries()]
+      .filter(([, n]) => n >= STALE_PROJECT_MIN)
+      .sort((a, b) => b[1] - a[1])
+    if (heavy.length && !dayMode) {
+      out.push({
+        category: 'structure',
+        tone: 'warn',
+        docId: 'projects-with-many-stale-tasks',
+        title: `${heavy.length} project${heavy.length > 1 ? 's' : ''} with many stale tasks`,
+        detail: 'Projects piling up long-open tasks may be overloaded, stalled, or need pruning.',
+        items: heavy.map(([id, n]) => ({
+          id,
+          label: projects.find((p) => p.id === id)?.name,
+          meta: `${n} stale`,
+          href: projectHref(id),
+        })),
+      })
+    }
+
+    // Open tasks already past their due date (distinct from stale = old + unscheduled).
+    const overdue = scopedOpen
+      .filter((t) => !t.isRecurring && t.dueDate != null && (toDay(t.dueDate) ?? '') < today)
+      .sort((a, b) => Date.parse(a.dueDate ?? '') - Date.parse(b.dueDate ?? ''))
+    if (overdue.length) {
+      out.push({
+        category: 'execution',
+        tone: 'warn',
+        docId: 'overdue-now',
+        title: `${overdue.length} task${overdue.length > 1 ? 's' : ''} overdue`,
+        detail: 'Open tasks past their due date — complete them or reschedule honestly.',
+        items: overdue.map((t) => ({
+          id: t.id,
+          label: t.content || undefined,
+          meta: `${Math.round((nowMs - Date.parse(t.dueDate ?? '')) / DAY)}d over`,
+          href: taskHref(t.id),
+        })),
+      })
+    }
+
+    // Waiting-for aging — items you've delegated/blocked (by label) and are
+    // waiting on. Old ones need a nudge or a drop. Dormant unless labels match.
+    const WAITING_STALE_MS = 14 * DAY
+    const waiting = scopedOpen.filter((t) => waitingIds.has(t.id))
+    if (waiting.length) {
+      const aged = waiting
+        .filter((t) => nowMs - Date.parse(t.added_at) > WAITING_STALE_MS)
+        .sort((a, b) => Date.parse(a.added_at) - Date.parse(b.added_at))
+      if (aged.length) {
+        const oldest = nowMs - Date.parse(aged[0].added_at)
+        out.push({
+          category: 'right-tasks',
+          tone: 'warn',
+          docId: 'waiting-for-aging',
+          title: `${aged.length} waiting-for item${aged.length > 1 ? 's' : ''} to chase`,
+          detail: `Delegated or blocked tasks pending over 14 days (oldest: ${Math.round(oldest / DAY)} days) — nudge them or drop them.`,
+          items: aged.map((t) => ({
+            id: t.id,
+            label: t.content || undefined,
+            meta: `${Math.round((nowMs - Date.parse(t.added_at)) / DAY)}d`,
+            href: taskHref(t.id),
+          })),
+        })
+      } else {
+        out.push({
+          category: 'right-tasks',
+          tone: 'good',
+          docId: 'waiting-for-aging',
+          title: 'Waiting-for list is fresh',
+          detail: 'Nothing you’re waiting on has been pending over 14 days.',
+        })
+      }
+    }
+  }
+
+  // ---- Throughput trend (closed: recent half vs earlier half of the window) ----
+  const mid = (filters.since.getTime() + nowMs) / 2
+  let closedEarly = 0
+  let closedLate = 0
+  for (const e of evs) {
+    if (classify(e).includes('closed')) {
+      if (Date.parse(e.event_date) < mid) closedEarly++
+      else closedLate++
+    }
+  }
+  if (closedEarly + closedLate >= 6 && !dayMode) {
+    if (closedLate >= closedEarly * 1.25) {
+      out.push({
+        category: 'execution',
+        tone: 'good',
+        docId: 'throughput-trend',
+        title: 'Throughput improving',
+        detail: `Closed ${closedLate} in the recent half vs ${closedEarly} earlier in this period.`,
+      })
+    } else if (closedEarly >= closedLate * 1.25) {
+      out.push({
+        category: 'execution',
+        tone: 'warn',
+        docId: 'throughput-trend',
+        title: 'Throughput declining',
+        detail: `Closed ${closedLate} in the recent half vs ${closedEarly} earlier in this period.`,
+      })
+    } else {
+      out.push({
+        category: 'execution',
+        tone: 'info',
+        docId: 'throughput-trend',
+        title: 'Throughput steady',
+        detail: 'Your closing pace is roughly flat across this period.',
+      })
+    }
+  }
+
+  // ---- Per-priority reliability (of work DUE this period, what share done) ----
+  // "Scheduled for this period" = due in the window at any point — INCLUDING
+  // tasks postponed/rescheduled OUT of it, so deferring instead of completing
+  // doesn't quietly inflate the rate. Bounded 0–100%.
+  const winStart = filters.since.getTime()
+  const winEnd = nowMs
+  const inWin = (s?: string | null) => {
+    if (!s) return false
+    const t = Date.parse(s)
+    return Number.isFinite(t) && t >= winStart && t <= winEnd
+  }
+  const scheduledDue = new Map<number, Set<string>>() // due this period, by priority
+  const completedDue = new Map<number, Set<string>>() // ...and completed
+  const mark = (m: Map<number, Set<string>>, p: number, id: string) => {
+    const s = m.get(p) ?? new Set<string>()
+    s.add(id)
+    m.set(p, s)
+  }
+  for (const e of evs) {
+    const x = e.extra_data ?? {}
+    const p = x.priority ?? 1
+    if (classify(e).includes('closed') && inWin(x.completed_due_date)) {
+      mark(scheduledDue, p, e.object_id)
+      mark(completedDue, p, e.object_id)
+    }
+    // Due moved OUT of the window (was due in, now isn't) — scheduled, not done.
+    if ('last_due_date' in x && inWin(x.last_due_date) && !inWin(x.due_date)) {
+      mark(scheduledDue, p, e.object_id)
+    }
+  }
+  for (const t of openTasks) if (inWin(t.dueDate)) mark(scheduledDue, t.priority, t.id)
+
+  const MIN_DUE = 3 // ignore tiny, noisy cohorts
+  const reliability = (p: number): number | null => {
+    const all = scheduledDue.get(p)
+    if (!all || all.size < MIN_DUE) return null
+    return Math.round((100 * (completedDue.get(p)?.size ?? 0)) / all.size)
+  }
+  const rel1 = reliability(4) // P1 (highest)
+  const rel4 = reliability(1) // P4 (lowest)
+  if (rel1 != null && rel4 != null && !dayMode) {
+    out.push(
+      rel1 >= rel4
+        ? {
+            category: 'prioritization',
+            tone: 'good',
+            docId: 'completion-reliability-by-priority',
+            title: `P1 reliability ${rel1}% ≥ P4 ${rel4}%`,
+            detail:
+              'Of work due this period, you complete a higher share at high priority than low — priorities are reliable. (Tasks postponed out of the period still count as not done.)',
+          }
+        : {
+            category: 'prioritization',
+            tone: 'warn',
+            docId: 'completion-reliability-by-priority',
+            title: `P1 reliability ${rel1}% < P4 ${rel4}%`,
+            detail:
+              'Of work due this period, you complete a smaller share at high priority than low — high-priority commitments may be slipping.',
+          },
+    )
+  }
+
+  // ---- On-time completion by priority (did you HIT the committed date?) ----
+  // Of completed dated tasks, the share finished by their due date, per priority.
+  const dueDoneTotal = new Map<number, number>()
+  const dueDoneOnTime = new Map<number, number>()
+  for (const e of evs) {
+    const x = e.extra_data ?? {}
+    if (classify(e).includes('closed') && x.completed_due_date) {
+      const p = x.priority ?? 1
+      dueDoneTotal.set(p, (dueDoneTotal.get(p) ?? 0) + 1)
+      if (x.was_overdue !== true) dueDoneOnTime.set(p, (dueDoneOnTime.get(p) ?? 0) + 1)
+    }
+  }
+  const MIN_ONTIME = 3
+  const onTime = (p: number): number | null => {
+    const tot = dueDoneTotal.get(p) ?? 0
+    return tot >= MIN_ONTIME ? Math.round((100 * (dueDoneOnTime.get(p) ?? 0)) / tot) : null
+  }
+  const ot1 = onTime(4) // P1
+  const ot4 = onTime(1) // P4
+  if (ot1 != null && ot4 != null && !dayMode) {
+    out.push(
+      ot1 >= ot4
+        ? {
+            category: 'prioritization',
+            tone: 'good',
+            docId: 'on-time-by-priority',
+            title: `P1 on-time ${ot1}% ≥ P4 ${ot4}%`,
+            detail:
+              'You hit due dates on high-priority work more often than low — priorities guide your scheduling.',
+          }
+        : {
+            category: 'prioritization',
+            tone: 'warn',
+            docId: 'on-time-by-priority',
+            title: `P1 on-time ${ot1}% < P4 ${ot4}%`,
+            detail:
+              'You hit due dates on high-priority work less often than low — high-priority dates may be slipping.',
+          },
+    )
+  }
+
+  // ---- Day-only reflections (the "day" preset) ----
+  if (dayMode) {
+    const todayDay = toDay(new Date(nowMs).toISOString()) ?? ''
+
+    // Plan kept — of tasks DUE today: done, pushed elsewhere, or still open.
+    const doneDue = new Set<string>()
+    const pushedDue = new Map<string, string | null>() // id → new due date
+    for (const e of evs) {
+      const x = e.extra_data ?? {}
+      if (classify(e).includes('closed') && toDay(x.completed_due_date) === todayDay) {
+        doneDue.add(e.object_id)
+      }
+      if ('last_due_date' in x && toDay(x.last_due_date) === todayDay && toDay(x.due_date) !== todayDay) {
+        pushedDue.set(e.object_id, x.due_date ?? null)
+      }
+    }
+    for (const id of doneDue) pushedDue.delete(id) // pushed then done anyway = done
+    // Snapshot may predate today's events, so subtract what events already settled.
+    const stillDue = scopedOpen.filter(
+      (t) => toDay(t.dueDate) === todayDay && !doneDue.has(t.id) && !pushedDue.has(t.id),
+    )
+    const planTotal = doneDue.size + pushedDue.size + stillDue.length
+    if (planTotal > 0) {
+      const ratio = doneDue.size / planTotal
+      out.push({
+        category: 'execution',
+        tone: ratio >= 0.8 ? 'good' : pushedDue.size > doneDue.size ? 'warn' : 'info',
+        docId: 'plan-kept',
+        title: `Kept ${doneDue.size} of ${planTotal} due today`,
+        detail: `Due today: ${doneDue.size} done, ${pushedDue.size} pushed, ${stillDue.length} still open.`,
+        items: [
+          ...stillDue.map((t) => ({
+            id: t.id,
+            label: t.content || undefined,
+            meta: 'still open',
+            href: taskHref(t.id),
+          })),
+          ...[...pushedDue.entries()].map(([id, due]) => ({
+            id,
+            label: nameById.get(id),
+            meta: due ? `→ ${fmtShortDay.format(Date.parse(due))}` : '→ no date',
+            href: taskHref(id),
+          })),
+        ],
+      })
+    }
+
+    // Pushed forward — everything postponed today (not just the due-today ones),
+    // with where it went. The mirror image of the done list.
+    if (opened + closed + postponed > 0) {
+      if (postponed === 0) {
+        out.push({
+          category: 'execution',
+          tone: 'good',
+          docId: 'pushed-forward',
+          title: 'Nothing pushed forward today',
+          detail: 'No task got moved to a later day.',
+        })
+      } else {
+        const pushed = [...postponesByItem.entries()].sort((a, b) => b[1] - a[1])
+        out.push({
+          category: 'execution',
+          tone: pushed.length >= 3 ? 'warn' : 'info',
+          docId: 'pushed-forward',
+          title: `Pushed ${pushed.length} task${pushed.length > 1 ? 's' : ''} forward`,
+          detail: 'Tasks moved to a later day today — the mirror of your done list.',
+          items: pushed.map(([id, n]) => {
+            const due = pushTarget.get(id)?.due
+            const target = due ? `→ ${fmtShortDay.format(Date.parse(due))}` : '→ no date'
+            return {
+              id,
+              label: nameById.get(id),
+              meta: n > 1 ? `${target} · ${n}×` : target,
+              href: taskHref(id),
+            }
+          }),
+        })
+      }
+    }
+
+    // Typical day — today's closes vs your median daily closes over the recent
+    // history we already hold (up to 28 days). Borrowed baseline: a raw count
+    // means nothing without "is that normal for me?".
+    const histFilters: Filters = { ...filters, since: new Date(0) }
+    const todayStartMs = Date.parse(`${todayDay}T00:00:00Z`)
+    const closedByDay = new Map<string, number>()
+    let earliestMs = Infinity
+    for (const e of events) {
+      if (!eventInScope(e, histFilters)) continue
+      const t = Date.parse(e.event_date)
+      if (t < earliestMs) earliestMs = t
+      if (t < todayStartMs && classify(e).includes('closed')) {
+        const d = toDay(e.event_date)
+        if (d) closedByDay.set(d, (closedByDay.get(d) ?? 0) + 1)
+      }
+    }
+    const BASELINE_MAX_DAYS = 28
+    const startMs = Math.max(
+      Number.isFinite(earliestMs) ? Math.floor(earliestMs / DAY) * DAY : todayStartMs,
+      todayStartMs - BASELINE_MAX_DAYS * DAY,
+    )
+    const counts: number[] = []
+    for (let ms = startMs; ms < todayStartMs; ms += DAY) {
+      counts.push(closedByDay.get(toDay(new Date(ms).toISOString()) ?? '') ?? 0)
+    }
+    if (counts.length >= 3) {
+      const sorted = [...counts].sort((a, b) => a - b)
+      const mid = sorted.length / 2
+      const median =
+        sorted.length % 2 ? sorted[Math.floor(mid)] : (sorted[mid - 1] + sorted[mid]) / 2
+      const medianStr = Number.isInteger(median) ? String(median) : median.toFixed(1)
+      out.push({
+        category: 'execution',
+        tone: closed >= median ? 'good' : 'info',
+        docId: 'typical-day',
+        title: `Closed ${closed} today — typical day is ${medianStr}`,
+        detail: `Median daily closes over your last ${counts.length} days (with the current filters).`,
+      })
+    }
   }
 
   return out

@@ -9,8 +9,17 @@
   } from '../lib/auth/vault'
   import { isWebAuthnAvailable } from '../lib/auth/webauthn'
   import Logo from './Logo.svelte'
+  import ThemeToggle from './ThemeToggle.svelte'
 
-  let { onUnlocked }: { onUnlocked: (token: string, cacheKey: CryptoKey) => void } = $props()
+  let {
+    onUnlocked,
+    theme,
+    onToggleTheme,
+  }: {
+    onUnlocked: (token: string, cacheKey: CryptoKey) => void
+    theme: 'dark' | 'light'
+    onToggleTheme: () => void
+  } = $props()
 
   const supported = isWebAuthnAvailable()
 
@@ -21,7 +30,6 @@
 
   // first-run enrollment fields
   let tokenInput = $state('')
-  let label = $state('My passkey')
 
   $effect(() => {
     loadVault().then((v) => {
@@ -45,13 +53,11 @@
   const doEnroll = () =>
     run(async () => {
       const token = tokenInput.trim()
+      // Auto-labelled — it's just the passkey's display name in the authenticator.
+      const now = new Date().toISOString()
       // We already hold the plaintext token here — no second ceremony needed;
       // the unlock path is exercised on the next session.
-      const { vault: v, cacheKey } = await enroll(
-        token,
-        label.trim() || 'My passkey',
-        new Date().toISOString(),
-      )
+      const { vault: v, cacheKey } = await enroll(token, `Hindsightly (${now.slice(0, 10)})`, now)
       vault = v
       onUnlocked(token, cacheKey)
     })
@@ -71,6 +77,7 @@
 </script>
 
 <main class="unlock">
+  <div class="topbar"><ThemeToggle {theme} onToggle={onToggleTheme} /></div>
   <h1><span class="logo"><Logo size={26} /></span> Hindsightly</h1>
 
   {#if !supported}
@@ -92,11 +99,19 @@
     </p>
     <label>
       API token
-      <input type="password" bind:value={tokenInput} autocomplete="off" placeholder="Todoist API token" />
-    </label>
-    <label>
-      Passkey label
-      <input type="text" bind:value={label} />
+      <!-- Ask password managers to ignore this field: the token is encrypted by
+           the passkey on-device, we don't want a second plaintext copy in a
+           vault. autocomplete="off" alone is ignored by most managers. -->
+      <input
+        type="password"
+        bind:value={tokenInput}
+        autocomplete="off"
+        data-1p-ignore="true"
+        data-lpignore="true"
+        data-bwignore
+        data-form-type="other"
+        placeholder="Todoist API token"
+      />
     </label>
     <button onclick={doEnroll} disabled={busy || !tokenInput.trim()}>
       {busy ? 'Registering…' : 'Register passkey & save'}
@@ -114,6 +129,11 @@
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 14px;
+  }
+  .topbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.25rem;
   }
   h1 {
     margin-top: 0;

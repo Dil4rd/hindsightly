@@ -5,13 +5,15 @@
 
 import { b64uDecode, b64uEncode } from '../auth/webauthn'
 import { cacheGet, cacheSet } from '../auth/idb'
-import type { ActivityEvent, CompletedItem, Project } from './types'
+import type { ActivityEvent, CompletedItem, OpenTask, Project } from './types'
 
 export interface CachePayload {
   fetchedSince: number // earliest event timestamp covered (ms)
   events: ActivityEvent[]
   completed: CompletedItem[]
   projects: Project[]
+  openTasks: OpenTask[]
+  isPremium: boolean
   savedAt: number
 }
 
@@ -46,7 +48,25 @@ export function stripEvent(e: ActivityEvent): ActivityEvent {
       last_priority: ed.last_priority,
       is_recurring: ed.is_recurring,
       has_time: ed.has_time,
+      completed_due_date: ed.completed_due_date,
+      was_overdue: ed.was_overdue,
     },
+  }
+}
+
+export function stripOpenTask(t: OpenTask): OpenTask {
+  // Keep ids + timelines (dueDate/isRecurring); drop the task title AND labels.
+  // Labels are user-defined strings that can be sensitive; the open-task snapshot
+  // is re-fetched live every session, so labels never need to persist at rest.
+  return {
+    id: t.id,
+    content: '',
+    project_id: t.project_id,
+    priority: t.priority,
+    added_at: t.added_at,
+    dueDate: t.dueDate,
+    isRecurring: t.isRecurring,
+    labels: [],
   }
 }
 
