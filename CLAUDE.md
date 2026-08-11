@@ -57,6 +57,9 @@ All three must pass before every commit.
 - User-facing changes go to `CHANGELOG.md` under `[Unreleased]`
   (Keep-a-Changelog). Parked/vetted ideas go to `ROADMAP.md` — it is curated,
   not a backlog dump; record probe-confirmed feasibility notes with each item.
+- At the end of each work iteration, refresh `AGENTS.md`: its "Current state"
+  section (date, versions, PR status, unreleased list) plus any section your
+  changes made stale. A cold-start agent must be able to trust it blindly.
 - Product intent: Hindsightly is a *retrospective instrument* ("did it work
   out, what to adjust?"), answering four questions — right tasks? sane
   structure? good prioritization? good execution? Metrics are the signal

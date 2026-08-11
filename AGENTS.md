@@ -25,6 +25,13 @@ Vitest, Node 22. Docker is the primary dev workflow.
 
 ## Current state (2026-08-11)
 
+> **Maintenance (agents): keep this file true.** At the end of each work
+> iteration, before the final commit: update this "Current state" section
+> (date, versions/tags, PR status, what's unreleased) and fix any other
+> section your changes made stale (new insight → docId list; new file →
+> file map; new invariant → CLAUDE.md). This file is only useful if a
+> cold-start agent can trust it blindly.
+
 - `package.json` 0.2.0; only `v0.1.0` is tagged so far — the `v0.2.0` tag is
   cut AFTER the release PR merges. **PR #1 (dev→main) is open** and bundles
   v0.2.0 plus everything under `[Unreleased]` in CHANGELOG.md — merging is the
@@ -189,5 +196,6 @@ label-picker pattern, coverage + per-goal drift on quarter view), someday/
 context label roles, tasks-that-are-really-projects, deadline-vs-due
 discipline, section WIP, tz correctness, postpone distance, recurring toggle,
 project turnover. Ship checklist for any feature: code + tests + INSIGHTS.md
-card (if a new insight) + CHANGELOG `[Unreleased]` + commit per stage, push
+card (if a new insight) + CHANGELOG `[Unreleased]` + **AGENTS.md refresh**
+(see the maintenance note under "Current state") + commit per stage, push
 to `dev`.
