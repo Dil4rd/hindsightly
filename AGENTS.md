@@ -1,27 +1,82 @@
-# AGENTS.md — cold-start briefing
+# AGENTS.md
 
-Everything a fresh agent needs to pick up the next task in this repo with no
-prior session context. Rules and invariants live in [CLAUDE.md](./CLAUDE.md) —
-read it first; this file is the *knowledge* layer (architecture, semantics,
-state). If they ever disagree, CLAUDE.md wins.
-
-**Non-negotiable, restated:** task names/content and label names never leave
-the browser and are never persisted — ids + dates/timelines only. When probing
-the live API (token may be in `.env`), print counts/ids/dates, never content.
+Single source of truth for agents working in this repo: rules first, then the
+knowledge a cold-start session needs. Claude Code auto-loads this via the
+`@AGENTS.md` import in [CLAUDE.md](./CLAUDE.md); other tools read it directly.
 
 ## What this is
 
-**Hindsightly** — a self-contained single-HTML-file dashboard that turns a
-Todoist account into a GTD *retrospective instrument*: "did it work out, what
-should I adjust?". It answers four questions — are you tracking the right
-tasks? does your project structure make sense? are you prioritizing well? are
-you executing well? Raw metrics are the signal layer; the *insight* layer
-interprets them. Privacy-first: no backend, token encrypted with a passkey,
-task text never at rest.
+**Hindsightly** — a self-contained, single-HTML-file, privacy-first
+retrospective dashboard for a Todoist-based GTD practice: "did it work out,
+what should I adjust?". It answers four questions — are you tracking the
+right tasks? does your project structure make sense? are you prioritizing
+well? are you executing well? Raw metrics are the signal layer; the *insight*
+layer interprets them. No backend; token encrypted with a passkey; task text
+never at rest. New features earn their place by serving the retro goal.
 
 Stack (locked): Svelte 5 (runes), Vite 6 + `vite-plugin-singlefile` (+ strict
 build-time CSP via `build/csp-plugin.ts`), TypeScript, uPlot, date-fns,
 Vitest, Node 22. Docker is the primary dev workflow.
+
+## Commands
+
+- `docker compose up dev` — primary dev workflow (Vite dev server)
+- `npm run check` — svelte-check + tsc; must be 0 errors AND 0 warnings
+- `npm test` — Vitest suite
+- `npm run build` — single-file `dist/index.html` (vite-plugin-singlefile)
+
+All three must pass before every commit.
+
+## Privacy — hard rules
+
+- Task names/content and label names must NEVER leave the browser or be
+  persisted. Not in the encrypted cache, not in logs, not in assistant/probe
+  output, not in any network call except the browser→Todoist API itself.
+  Only task/project/label **ids and dates/timelines** are OK outside RAM.
+- Anything persisted goes through the `strip*` functions in
+  `src/lib/todoist/cache.ts` (titles AND `labels[]` zeroed) and is AES-GCM
+  encrypted under the passkey-derived key. Same for `settings.ts` (label ids
+  only, never names).
+- When debugging against the live API (a token may be available in `.env`),
+  print counts/ids/dates only — never task content.
+- Stay inside this repo folder.
+
+## Invariants (each one exists because of a real bug)
+
+- Task titles resolve ONLY through `taskNameIndex` (`src/lib/stats/names.ts`).
+  Never read `extra_data.content` directly in UI code — the cache is name-free,
+  so names silently vanish after a reload.
+- Every `Insight` carries a `docId` matching a heading slug in
+  `docs/INSIGHTS.md`; the KNOWN set in `tests/insights.test.ts` enforces it.
+  A new insight ships with its methodology card (Measures / Ignores / Source /
+  Caveats) in the same commit.
+- Colors come from CSS vars in `src/app.css` (`:root` dark +
+  `:root[data-theme="light"]`). No hardcoded colors in components — hardcoded
+  dark values have twice shipped invisible-in-light-theme bugs.
+- Drawer/list `{#each}` blocks over per-event items must NOT key by task id —
+  ids repeat across events and Svelte 5 throws on duplicate keys. Key by index.
+- uPlot axis `incrs`/`scale.time` are baked at construction: rebuild the chart
+  on granularity change, `setData` is not enough.
+- `metricBreakdown` and `computeMetrics` must share the same suppression path
+  or drawer contents diverge from card counts (a test locks this).
+- Todoist priorities are internal scale: **4 = P1 (highest), 1 = P4**.
+- Todoist API is unified v1 (`/api/v1/...`), cursor pagination; the completed
+  endpoint rejects ranges > ~3 months (chunked in `client.ts`); free accounts
+  keep only ~7 days of activity (`is_premium` gates long presets).
+
+## Workflow
+
+- `main` is protected. Work on `dev`; one PR `dev`→`main` per release; a
+  `vX.Y.Z` tag fires the release workflow (single-file artifact). A
+  self-authored PR cannot be merged by the agent — merging is the user's call.
+- Commit at the end of each stage of work; short commit messages; push to
+  `dev` after each commit so the user can verify.
+- User-facing changes go to `CHANGELOG.md` under `[Unreleased]`
+  (Keep-a-Changelog). Parked/vetted ideas go to `ROADMAP.md` — it is curated,
+  not a backlog dump; record probe-confirmed feasibility notes with each item.
+- Ship checklist for any feature: code + tests + INSIGHTS.md card (if a new
+  insight) + CHANGELOG `[Unreleased]` + refresh of this file (see maintenance
+  note below) + commit per stage, push to `dev`.
 
 ## Current state (2026-08-11)
 
@@ -29,18 +84,17 @@ Vitest, Node 22. Docker is the primary dev workflow.
 > iteration, before the final commit: update this "Current state" section
 > (date, versions/tags, PR status, what's unreleased) and fix any other
 > section your changes made stale (new insight → docId list; new file →
-> file map; new invariant → CLAUDE.md). This file is only useful if a
+> file map; new bug-born rule → Invariants). This file is only useful if a
 > cold-start agent can trust it blindly.
 
 - `package.json` 0.2.0; only `v0.1.0` is tagged so far — the `v0.2.0` tag is
   cut AFTER the release PR merges. **PR #1 (dev→main) is open** and bundles
-  v0.2.0 plus everything under `[Unreleased]` in CHANGELOG.md — merging is the
-  user's call (protected main; a self-authored PR cannot be merged by the
-  agent). Given the unreleased additions, the merged state may warrant going
-  straight to v0.3.0 (user decides).
+  v0.2.0 plus everything under `[Unreleased]` in CHANGELOG.md. Given the
+  unreleased additions, the merged state may warrant going straight to v0.3.0
+  (user decides).
 - Unreleased on `dev`: waiting-for aging insight + in-app label picker
   (encrypted per-account settings), the **day** preset (daily reflections +
-  time-of-day chart), CLAUDE.md, this file.
+  time-of-day chart), this file.
 - Deploy: Vercel serves `main` at hindsightly.vercel.app; pushing a `v*` tag
   runs `.github/workflows/release.yml` (Docker build → single-file HTML
   attached to a GitHub Release).
@@ -105,8 +159,7 @@ re-enrolling).
 - `lib/stats/events.ts` — `classify()` event→buckets, `toDay()`,
   `suppressedDueChanges()` (reschedule debounce), `countedBuckets()`,
   `isRecurringCompletion()`.
-- `lib/stats/metrics.ts` — `computeMetrics` + `metricBreakdown` (same
-  suppression path — breakdown lengths MUST equal counts; a test locks this).
+- `lib/stats/metrics.ts` — `computeMetrics` + `metricBreakdown`.
 - `lib/stats/insights.ts` — the insight engine (below).
 - `lib/stats/series.ts` — `granularityFor` (day→daypart, week/month→day,
   quarter/year→week), `DAY_PARTS` (5 local-clock slots), `trendSeries`.
@@ -125,7 +178,6 @@ re-enrolling).
   it is NOT a postpone; `recurringClosed` is a surfaced subset of closed.
 - Debounce: multiple due-changes on one task within the window collapse to
   one (typo correction), see `suppressedDueChanges`.
-- Priorities: internal 1..4 where **4 = P1 (highest)**.
 - `extra_data` on activity events: `content`/`last_content` (in-memory only),
   `due_date`/`last_due_date` (presence = due change), `priority`/
   `last_priority` (presence = priority change), `is_recurring`,
@@ -136,8 +188,7 @@ re-enrolling).
 ## Insight engine (`lib/stats/insights.ts`)
 
 Pure function; every insight = `{ category, tone: good|warn|info, title,
-detail, docId, items? }`. `docId` must match a heading slug in
-`docs/INSIGHTS.md` (KNOWN-set test). Categories = the four questions
+detail, docId, items? }`. Categories = the four questions
 (`right-tasks | structure | prioritization | execution`).
 
 Signature quirk: `computeInsights(events, completed, projects, openTasks,
@@ -180,11 +231,6 @@ components (`new Date(y, m, d, h)`) to stay timezone-proof.
   event-derived changes (see plan-kept) rather than trusting the snapshot.
 - Free plan: ~7 days of activity → only `day`/`week` presets enabled
   (`FREE_PRESETS`), detected via `isPremium()`.
-- The completed endpoint 400s on ranges > ~3 months (client chunks by 84d).
-- uPlot: axis `incrs` + `scale.time` are fixed at construction — rebuild on
-  granularity change; `{#each}` over per-event lists keys by index.
-- `metricBreakdown` and `computeMetrics` must share the suppression path or
-  drawer contents diverge from card counts.
 
 ## Where the next task likely comes from
 
@@ -195,7 +241,4 @@ alignment lens (design agreed 2026-08: goal→project/label mapping reusing the
 label-picker pattern, coverage + per-goal drift on quarter view), someday/
 context label roles, tasks-that-are-really-projects, deadline-vs-due
 discipline, section WIP, tz correctness, postpone distance, recurring toggle,
-project turnover. Ship checklist for any feature: code + tests + INSIGHTS.md
-card (if a new insight) + CHANGELOG `[Unreleased]` + **AGENTS.md refresh**
-(see the maintenance note under "Current state") + commit per stage, push
-to `dev`.
+project turnover.
